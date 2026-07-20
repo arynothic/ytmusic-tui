@@ -13,7 +13,10 @@ import {
   SqliteHistoryStore,
   SqliteQueueStore,
 } from '@/repositories';
+import { createInnertubeClient, YouTubeMusicGateway } from '@/services/gateway';
+import { YtDlpStreamResolver } from '@/services/stream';
 import { createLogger } from '@/utils/logger';
+import { TokenBucketRateLimiter } from '@/utils/rate-limiter';
 
 /**
  * The composition root: every wired dependency a command needs.
@@ -61,6 +64,27 @@ export async function createAppContext(): Promise<AppContext> {
   container.register(Tokens.HistoryStore, () => new SqliteHistoryStore(getHistoryDb()));
   container.register(Tokens.SecretStore, () =>
     createSecretStore({ credentialsFile: paths.credentialsFile, logger }),
+  );
+  container.register(
+    Tokens.MusicGateway,
+    () =>
+      new YouTubeMusicGateway({
+        factory: createInnertubeClient,
+        rateLimiter: new TokenBucketRateLimiter({
+          capacity: Math.max(1, Math.ceil(config.rateLimit.requestsPerSecond)),
+          refillPerSecond: config.rateLimit.requestsPerSecond,
+        }),
+        logger,
+      }),
+  );
+  container.register(
+    Tokens.StreamResolver,
+    (c) =>
+      new YtDlpStreamResolver({
+        cacheStore: c.resolve(Tokens.CacheStore),
+        streamTtlMs: config.cache.streamTtlSeconds * 1000,
+        logger,
+      }),
   );
 
   logger.debug({ configDir: paths.configDir }, 'application context initialized');
