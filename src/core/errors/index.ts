@@ -1,0 +1,16 @@
+export { AppError, type AppErrorOptions } from '@/core/errors/app-error';
+export { AssertionFailedError } from '@/core/errors/assertion-error';
+export { ApiError, type ApiErrorCode } from '@/core/errors/api-error';
+export { AuthError, type AuthErrorCode } from '@/core/errors/auth-error';
+export { CacheError, type CacheErrorCode } from '@/core/errors/cache-error';
+export { ConfigError, type ConfigErrorCode } from '@/core/errors/config-error';
+export { DownloadError, type DownloadErrorCode } from '@/core/errors/download-error';
+export { ExitCode } from '@/core/errors/exit-code';
+export { invariant } from '@/core/errors/invariant';
+export { NetworkError, type NetworkErrorCode } from '@/core/errors/network-error';
+export { toAppError } from '@/core/errors/normalize';
+export { PlayerError, type PlayerErrorCode } from '@/core/errors/player-error';
+export { isRetryableError } from '@/core/errors/retryable';
+export { StreamError, type StreamErrorCode } from '@/core/errors/stream-error';
+export { UnexpectedError } from '@/core/errors/unexpected-error';
+export { ValidationError } from '@/core/errors/validation-error';

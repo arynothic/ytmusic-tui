@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`program > prints help 1`] = `
+"Usage: ytmusic [options] [command]
+
+A fast, modern terminal client for YouTube Music
+
+Options:
+  -V, --version   output the version number
+  -h, --help      display help for command
+
+Commands:
+  config          View and manage configuration
+  help [command]  display help for command
+"
+`;
