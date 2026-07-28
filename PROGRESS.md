@@ -36,40 +36,25 @@ models/ types/ utils/  (leaf modules — imported by all, import nothing in src)
 
 ## Increments completed (each verified: typecheck + lint + tests + build)
 
-| # | Scope | Tests after |
-|---|-------|-------------|
-| 1 | Scaffold: package.json, tsconfig(strict), tsup, vitest, eslint(typed, no-cycle), prettier, husky, lint-staged, CI/dependabot/renovate, editorconfig | 2 |
-| 2 | types/ (utility types), core/errors/ (AppError taxonomy, invariant, retryable, normalize), utils/ (sleep, retry w/ jitter, token-bucket limiter, time, exec, env, logger) | 73 |
-| 3 | models/ (zod: Track/Album/Artist/Playlist/Lyrics/Queue/Search/Config/Credentials/Stream/History, branded IDs, acyclic graph), core/ports/ (7 interfaces), DI container + tokens | 98 |
-| 4 | config/ (XDG paths, cosmiconfig loader, env overrides, ConfigService), composition root, `ytmusic config` cmd, fatal-error handler, EPIPE safety | 138 |
-| 5 | cache/ (openDatabase, migrations via user_version, ttl), repositories/ (SqliteCacheStore/HistoryStore/QueueStore, corrupt-row self-healing) | 163 |
-| 6 | auth/ (KeytarSecretStore, FileSecretStore 0600 atomic+mutex, FallbackSecretStore, cookie parser header+Netscape, SessionManager), MockMusicGateway test backbone | 200 |
-| 7a | services/gateway/ (MusicClient narrow iface, loose zod mappers, error-normalizer, YouTubeMusicGateway w/ rate-limit+retry+continuation tokens), services/stream/ (YtDlpStreamResolver w/ SQLite URL cache), context wiring | 235 |
+| #   | Scope                                                                                                                                                                                                                      | Tests after |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | Scaffold: package.json, tsconfig(strict), tsup, vitest, eslint(typed, no-cycle), prettier, husky, lint-staged, CI/dependabot/renovate, editorconfig                                                                        | 2           |
+| 2   | types/ (utility types), core/errors/ (AppError taxonomy, invariant, retryable, normalize), utils/ (sleep, retry w/ jitter, token-bucket limiter, time, exec, env, logger)                                                  | 73          |
+| 3   | models/ (zod: Track/Album/Artist/Playlist/Lyrics/Queue/Search/Config/Credentials/Stream/History, branded IDs, acyclic graph), core/ports/ (7 interfaces), DI container + tokens                                            | 98          |
+| 4   | config/ (XDG paths, cosmiconfig loader, env overrides, ConfigService), composition root, `ytmusic config` cmd, fatal-error handler, EPIPE safety                                                                           | 138         |
+| 5   | cache/ (openDatabase, migrations via user_version, ttl), repositories/ (SqliteCacheStore/HistoryStore/QueueStore, corrupt-row self-healing)                                                                                | 163         |
+| 6   | auth/ (KeytarSecretStore, FileSecretStore 0600 atomic+mutex, FallbackSecretStore, cookie parser header+Netscape, SessionManager), MockMusicGateway test backbone                                                           | 200         |
+| 7a  | services/gateway/ (MusicClient narrow iface, loose zod mappers, error-normalizer, YouTubeMusicGateway w/ rate-limit+retry+continuation tokens), services/stream/ (YtDlpStreamResolver w/ SQLite URL cache), context wiring | 235         |
+| 7b  | Gateway + stream-resolver test suites (fake MusicClient, continuation roundtrip, shelf classification, playlist CRUD, yt-dlp parse/cache/failure modes)                                                                    | 289         |
+| 8   | player/ (mpv JSON IPC backend + reconnect/spawn lifecycle, VLC RC fallback backend, availability factory), MockPlayerBackend, real-mpv integration smoke test                                                              | 331         |
 
-Current: **235 tests passing**, `pnpm typecheck/lint/test/build` all green.
-
-## ⚠️ RESUME POINT (session paused 2026-07-20)
-
-Increment 7 is ~90% done. What remains of it:
-
-1. Write `tests/unit/services/gateway/youtube-music-gateway.test.ts`
-   - Fake `MusicClient` (plain object, `vi.fn(async () => fixture)` methods) + `factory` returning it; real `TokenBucketRateLimiter` (capacity 100, 1000 rps); pass `retry: { attempts: 2, sleep: noop }` so retries are instant.
-   - Vendor fixtures ready in `tests/unit/services/gateway/fixtures.ts`
-     (trackNode, albumNode, artistNode, playlistNode, podcastNode, albumPageFixture,
-     artistPageFixture, playlistPageFixture, libraryFixture, trackInfoFixture, searchPageFixture).
-   - Cover: lazy anonymous client; filter→vendor-type map (`songs`→`song`, `podcasts`→`playlist`, null→`all`); continuation token roundtrip (`has_continuation: true` + `getContinuation` on response object; unknown token → ApiError); `searchPages` generator; authenticate success/failure (getLibrary rejects "…401…" → AuthError); getAuthenticatedUser via `account.getInfo()`; getTrack/getAlbum/getArtist/getPlaylist/getLyrics; getLikedSongs uses playlist id `'LL'`; library shelf classification; history + limit; playlist CRUD (removeVideos called with `useSetVideoIds=true`); error normalization (429 → ApiError API_RATE_LIMITED after retries).
-2. Write `tests/unit/services/stream/yt-dlp-stream-resolver.test.ts`
-   - `tests/mocks/mock-cache-store.ts` (MockCacheStore) is ready. Inject `run`/`findExec` fakes.
-   - Cover: resolve+parse (`-j` JSON: url with `?expire=`, ext, abr), cache hit avoids re-run,
-     near-expiry cached URL (within 60s margin) re-resolves, missing binary → STREAM_RESOLVER_MISSING,
-     non-zero exit → STREAM_RESOLVE_FAILED, killed → timeout error, bad JSON → STREAM_RESOLVE_FAILED,
-     no `expire` param → ~6h fallback expiry.
-3. Then verify (`pnpm typecheck && pnpm lint && pnpm test && pnpm build`) and proceed to increment 8 (player/).
+Current: **331 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
+`pnpm typecheck/lint/test/build` all green.
 
 ### Lessons from increment 7 (don't relearn)
 
 - `Innertube` instance structurally satisfies the narrow `MusicClient` interface — NO cast needed
-  (private members in the *source* don't block assignment *to* a plain interface).
+  (private members in the _source_ don't block assignment _to_ a plain interface).
 - youtubei.js v17 `MusicSearchType` = all/song/video/album/playlist/artist — no podcast;
   podcasts surface as `item_type: 'podcast_show'` in playlist-typed searches.
 - Search continuation is object-based (call `.getContinuation()` on the response), not token-based;
@@ -77,6 +62,21 @@ Increment 7 is ~90% done. What remains of it:
 - Vendor classes carry private fields → never type mapper inputs as vendor classes; the loose
   zod schemas in `loose-schemas.ts` parse class instances fine (property access).
 - Word-boundary regex gotcha: "Coldplay" contains "play" — use `\b...\b` in subtitle filters.
+
+### Lessons from increment 8 (don't relearn)
+
+- mpv JSON IPC: newline-delimited JSON over `--input-ipc-server` socket; replies correlate by
+  `request_id`, everything else is an event. Snapshot stays fresh via `observe_property`
+  (pause/time-pos/volume) — no polling. `end-file` → idle is the queue-advance signal.
+- VLC RC (`-I rc --rc-host 127.0.0.1:PORT --rc-quiet`) is line-based; `pause` is a TOGGLE,
+  volume scale is 0-256 (ours 0-100). VLC has no idle mode → one `--play-and-exit` process
+  per track; process exit = track end. Position via `get_time` polling (injectable poller).
+- Both backends take injectable spawner/connector/sleep; unit tests use fakes, and
+  `tests/integration/mpv-backend.integration.test.ts` smoke-tests real mpv with a
+  3s ffmpeg-generated sine tone (skipIf binaries missing).
+- Getter-in-harness gotcha: destructuring a lazy getter evaluates it immediately —
+  access `harness.pollCallback` AFTER `play()`, not via destructure.
+- Server-push assertions need `vi.waitFor` (TCP delivery is async even on loopback).
 
 ## Commands working today
 
@@ -92,11 +92,11 @@ Increment 7 is ~90% done. What remains of it:
   history.db separate. Corrupt rows are deleted + treated as misses.
 - FileSecretStore serializes ops via async mutex; atomic tmp+rename writes; 0600/0700 perms.
 - EPIPE on stdout/stderr → clean exit 0 (pipe to `head` safe).
+- Player backends keep their own snapshot (no polling for mpv; RC polling for VLC) and
+  translate process/IPС events into PlayerSnapshot streams; services never touch processes.
 
 ## Next increments
 
-7b. Gateway + resolver test files (see RESUME POINT above)
-8. player/ (mpv JSON IPC backend, vlc fallback, availability factory) + MockPlayerBackend
 9. services/ app layer: queue-engine (pure), SearchService, PlaybackService, QueueService,
    LibraryService, PlaylistService, LyricsService, DownloadService, AuthService
 10. commands/: search play artist album playlist queue now pause resume stop volume next
@@ -105,6 +105,7 @@ Increment 7 is ~90% done. What remains of it:
 12. README/CONTRIBUTING/CHANGELOG, coverage thresholds ≥90%, final verification
 
 Test doubles ready: `tests/mocks/mock-music-gateway.ts`, `tests/mocks/mock-cache-store.ts`,
+`tests/mocks/mock-player-backend.ts`,
 `tests/helpers/` (temp-dir, test-context w/ stdout+stderr capture, fixtures).
 
 ## Verify
@@ -112,3 +113,5 @@ Test doubles ready: `tests/mocks/mock-music-gateway.ts`, `tests/mocks/mock-cache
 ```sh
 pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
+
+Note: on this machine `pnpm` runs via corepack (`corepack pnpm ...`); node via fnm.
