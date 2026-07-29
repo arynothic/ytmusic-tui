@@ -273,9 +273,14 @@ export class MpvPlayerBackend implements PlayerBackend {
       return;
     }
     if (event['event'] === 'end-file') {
-      // Natural end of track (or a replaced file): the queue engine
-      // listens for this transition to advance.
-      this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
+      // Only a natural end (or a playback error) means "track finished".
+      // 'replace'/'stop'/'quit' are our own commands — the corresponding
+      // play()/stop()/dispose() calls already set the right status.
+      const reason =
+        (event['data'] as Record<string, unknown> | undefined)?.['reason'] ?? event['reason'];
+      if (reason === 'eof' || reason === 'error') {
+        this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
+      }
     }
   }
 

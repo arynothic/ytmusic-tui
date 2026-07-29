@@ -1,11 +1,21 @@
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
 import type { Database } from 'better-sqlite3';
 import type { Logger } from 'pino';
 
-import { createSecretStore } from '@/auth';
-import { ConfigService, ensureConfigDirectory, loadConfig, resolveAppPathsFromEnv, type AppPaths } from '@/config';
+import { createSecretStore, SessionManager } from '@/auth';
+import {
+  ConfigService,
+  ensureConfigDirectory,
+  loadConfig,
+  resolveAppPathsFromEnv,
+  type AppPaths,
+} from '@/config';
 import { Container } from '@/core/container';
 import { Tokens } from '@/core/tokens';
 import type { AppConfig } from '@/models';
+import { createPlayerBackend, LazyPlayerBackend } from '@/player';
 import {
   openCacheDatabase,
   openHistoryDatabase,
@@ -13,7 +23,15 @@ import {
   SqliteHistoryStore,
   SqliteQueueStore,
 } from '@/repositories';
+import { AuthService } from '@/services/auth';
+import { DownloadService } from '@/services/download';
 import { createInnertubeClient, YouTubeMusicGateway } from '@/services/gateway';
+import { LibraryService } from '@/services/library';
+import { LyricsService } from '@/services/lyrics';
+import { PlaybackService } from '@/services/playback';
+import { PlaylistService } from '@/services/playlists';
+import { QueueService } from '@/services/queue';
+import { SearchService } from '@/services/search';
 import { YtDlpStreamResolver } from '@/services/stream';
 import { createLogger } from '@/utils/logger';
 import { TokenBucketRateLimiter } from '@/utils/rate-limiter';
@@ -83,6 +101,96 @@ export async function createAppContext(): Promise<AppContext> {
       new YtDlpStreamResolver({
         cacheStore: c.resolve(Tokens.CacheStore),
         streamTtlMs: config.cache.streamTtlSeconds * 1000,
+        logger,
+      }),
+  );
+
+  // The player backend is detected lazily so non-playback commands never
+  // pay for (or fail on) mpv/VLC detection.
+  container.register(
+    Tokens.PlayerBackend,
+    () =>
+      new LazyPlayerBackend({
+        volume: config.player.volume,
+        factory: () =>
+          createPlayerBackend({
+            preference: config.player.backend,
+            volume: config.player.volume,
+            ...(config.player.mpvPath !== undefined ? { mpvPath: config.player.mpvPath } : {}),
+            ...(config.player.vlcPath !== undefined ? { vlcPath: config.player.vlcPath } : {}),
+            logger,
+          }),
+      }),
+  );
+
+  container.register(
+    Tokens.SessionManager,
+    (c) =>
+      new SessionManager(c.resolve(Tokens.SecretStore), c.resolve(Tokens.MusicGateway), logger),
+  );
+  container.register(
+    Tokens.AuthService,
+    (c) => new AuthService({ sessionManager: c.resolve(Tokens.SessionManager) }),
+  );
+  container.register(
+    Tokens.QueueService,
+    (c) => new QueueService({ queueStore: c.resolve(Tokens.QueueStore) }),
+  );
+  container.register(
+    Tokens.SearchService,
+    (c) =>
+      new SearchService({
+        gateway: c.resolve(Tokens.MusicGateway),
+        cache: c.resolve(Tokens.CacheStore),
+        searchTtlMs: config.cache.searchTtlSeconds * 1000,
+        defaultLimit: config.search.limit,
+      }),
+  );
+  container.register(
+    Tokens.LibraryService,
+    (c) =>
+      new LibraryService({
+        gateway: c.resolve(Tokens.MusicGateway),
+        cache: c.resolve(Tokens.CacheStore),
+        historyStore: c.resolve(Tokens.HistoryStore),
+        metadataTtlMs: config.cache.metadataTtlSeconds * 1000,
+        volatileTtlMs: config.cache.searchTtlSeconds * 1000,
+      }),
+  );
+  container.register(
+    Tokens.PlaylistService,
+    (c) =>
+      new PlaylistService({
+        gateway: c.resolve(Tokens.MusicGateway),
+        cache: c.resolve(Tokens.CacheStore),
+      }),
+  );
+  container.register(
+    Tokens.LyricsService,
+    (c) =>
+      new LyricsService({
+        gateway: c.resolve(Tokens.MusicGateway),
+        cache: c.resolve(Tokens.CacheStore),
+        lyricsTtlMs: config.cache.metadataTtlSeconds * 1000,
+      }),
+  );
+  container.register(
+    Tokens.DownloadService,
+    () =>
+      new DownloadService({
+        directory: config.download.directory ?? join(homedir(), 'Music', 'ytmusic'),
+        audioFormat: config.download.audioFormat,
+        logger,
+      }),
+  );
+  container.register(
+    Tokens.PlaybackService,
+    (c) =>
+      new PlaybackService({
+        player: c.resolve(Tokens.PlayerBackend),
+        streamResolver: c.resolve(Tokens.StreamResolver),
+        queueService: c.resolve(Tokens.QueueService),
+        historyStore: c.resolve(Tokens.HistoryStore),
         logger,
       }),
   );

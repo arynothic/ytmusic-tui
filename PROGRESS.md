@@ -47,8 +47,9 @@ models/ types/ utils/  (leaf modules — imported by all, import nothing in src)
 | 7a  | services/gateway/ (MusicClient narrow iface, loose zod mappers, error-normalizer, YouTubeMusicGateway w/ rate-limit+retry+continuation tokens), services/stream/ (YtDlpStreamResolver w/ SQLite URL cache), context wiring | 235         |
 | 7b  | Gateway + stream-resolver test suites (fake MusicClient, continuation roundtrip, shelf classification, playlist CRUD, yt-dlp parse/cache/failure modes)                                                                    | 289         |
 | 8   | player/ (mpv JSON IPC backend + reconnect/spawn lifecycle, VLC RC fallback backend, availability factory), MockPlayerBackend, real-mpv integration smoke test                                                              | 331         |
+| 9   | services/ app layer: queue-engine (pure) + QueueService, PlaybackService (auto-advance), Search/Library/Playlist/Lyrics/Download/Auth services, LazyPlayerBackend, full context wiring, MockQueueStore/MockHistoryStore    | 401         |
 
-Current: **331 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
+Current: **401 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
 `pnpm typecheck/lint/test/build` all green.
 
 ### Lessons from increment 7 (don't relearn)
@@ -95,17 +96,31 @@ Current: **331 tests passing** (incl. 1 real-mpv integration test, auto-skipped 
 - Player backends keep their own snapshot (no polling for mpv; RC polling for VLC) and
   translate process/IPС events into PlayerSnapshot streams; services never touch processes.
 
+### Lessons from increment 9 (don't relearn)
+
+- "idle" means different things per backend: mpv emits `end-file` for eof AND replace/stop/quit —
+  filter by `reason` (only eof/error → idle). VLC `--play-and-exit` exits for natural end AND
+  our kills — track intentional kills in a WeakSet. Only natural ends trigger auto-advance.
+- Container factories are sync; player detection is async → `LazyPlayerBackend` proxy wires
+  listeners exactly once (Map<listener, unsub>) and reports a static idle snapshot pre-init.
+- `no-unused-private-class-members` false-positives on `#field ??=` — use an explicit read instead.
+- zod `.nullable()` on a schema enables negative-result caching (lyrics miss ≠ cache miss).
+- yt-dlp `--newline` + `--print after_move:filepath` gives line-based progress + the final path;
+  progress parses from `[download]  42.3%`.
+- MockMusicGateway.addTracksToPlaylist requires seeded tracks; SecretStore requires isAvailable().
+- Queue semantics: after next()→null at queue end, currentIndex stays — previous() then steps
+  back from the last track (so it returns the second-to-last).
+
 ## Next increments
 
-9. services/ app layer: queue-engine (pure), SearchService, PlaybackService, QueueService,
-   LibraryService, PlaylistService, LyricsService, DownloadService, AuthService
 10. commands/: search play artist album playlist queue now pause resume stop volume next
     previous lyrics login logout cache download + UI kit (tables, highlight, spinners)
 11. cli/tui/ Ink full-screen mode + hooks
 12. README/CONTRIBUTING/CHANGELOG, coverage thresholds ≥90%, final verification
 
 Test doubles ready: `tests/mocks/mock-music-gateway.ts`, `tests/mocks/mock-cache-store.ts`,
-`tests/mocks/mock-player-backend.ts`,
+`tests/mocks/mock-player-backend.ts`, `tests/mocks/mock-queue-store.ts`,
+`tests/mocks/mock-history-store.ts`,
 `tests/helpers/` (temp-dir, test-context w/ stdout+stderr capture, fixtures).
 
 ## Verify

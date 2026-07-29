@@ -48,6 +48,8 @@ export class MockMusicGateway implements MusicGateway {
 
   /** Every credential set passed to authenticate(), for assertions. */
   readonly authenticateCalls: Credentials[] = [];
+  /** When set, authenticate() rejects with this error. */
+  failOnAuthenticate: Error | undefined;
   #credentials: Credentials | undefined;
   #playlistCounter = 0;
 
@@ -68,6 +70,9 @@ export class MockMusicGateway implements MusicGateway {
 
   authenticate(credentials: Credentials): Promise<void> {
     this.authenticateCalls.push(credentials);
+    if (this.failOnAuthenticate !== undefined) {
+      return Promise.reject(this.failOnAuthenticate);
+    }
     this.#credentials = credentials;
     return Promise.resolve();
   }

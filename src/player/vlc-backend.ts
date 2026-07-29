@@ -98,6 +98,8 @@ export class VlcPlayerBackend implements PlayerBackend {
   #process: VlcProcessHandle | undefined;
   #connection: VlcRcConnection | undefined;
   #cancelPoll: (() => void) | undefined;
+  /** Processes killed by us (stop/dispose/track-switch), not natural ends. */
+  readonly #intentionalKills = new WeakSet<VlcProcessHandle>();
   #snapshot: PlayerSnapshot;
   readonly #listeners = new Set<PlayerStateListener>();
 
@@ -277,13 +279,22 @@ export class VlcPlayerBackend implements PlayerBackend {
     }
   }
 
-  /** Handles VLC exiting (track end, quit, or crash). */
+  /** Handles VLC exiting (natural track end vs. our own teardown). */
   #handleExit(processHandle: VlcProcessHandle): void {
     if (this.#process !== processHandle) {
       return;
     }
-    this.#teardownProcess();
-    this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
+    const intentional = this.#intentionalKills.has(processHandle);
+    this.#cancelPoll?.();
+    this.#cancelPoll = undefined;
+    this.#connection?.close();
+    this.#connection = undefined;
+    this.#process = undefined;
+    this.#intentionalKills.delete(processHandle);
+    if (!intentional) {
+      // Natural exit under --play-and-exit: the track finished.
+      this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
+    }
   }
 
   /** Kills the current process and closes the RC connection, if any. */
@@ -292,8 +303,11 @@ export class VlcPlayerBackend implements PlayerBackend {
     this.#cancelPoll = undefined;
     this.#connection?.close();
     this.#connection = undefined;
-    this.#process?.kill('SIGTERM');
-    this.#process = undefined;
+    if (this.#process !== undefined) {
+      this.#intentionalKills.add(this.#process);
+      this.#process.kill('SIGTERM');
+      this.#process = undefined;
+    }
   }
 
   /** Returns the live connection or raises PLAYER_NO_ACTIVE_SESSION. */
