@@ -39,6 +39,8 @@ class FakeMpvConnection implements MpvIpcConnection {
 /** In-memory child process emitting exit events on demand. */
 class FakeMpvProcess implements MpvProcessHandle {
   killSignals: (NodeJS.Signals | number)[] = [];
+  /** Mirrors reality: the IPC socket exists only while the process runs. */
+  alive = false;
   readonly #exitListeners: ((code: number | null, signal: NodeJS.Signals | null) => void)[] = [];
 
   on(
@@ -58,6 +60,7 @@ class FakeMpvProcess implements MpvProcessHandle {
   }
 
   emitExit(code = 0): void {
+    this.alive = false;
     for (const listener of this.#exitListeners) {
       listener(code, null);
     }
@@ -71,24 +74,37 @@ interface Harness {
   spawnCalls: { binary: string; args: readonly string[] }[];
 }
 
-/** Builds a backend whose spawn/connect plumbing is fully fake. */
-function makeBackend(options: { connectError?: Error } = {}): Harness {
+/**
+ * Builds a backend whose spawn/connect plumbing is fully fake.
+ * By default the IPC socket "exists" only while the fake process runs,
+ * so the backend takes the spawn path; `resident: true` simulates an
+ * already-running (foreign) mpv that accepts connections immediately.
+ */
+function makeBackend(options: { connectError?: Error; resident?: boolean } = {}): Harness {
   const connection = new FakeMpvConnection();
   const process = new FakeMpvProcess();
   const spawnCalls: { binary: string; args: readonly string[] }[] = [];
   const connectError = options.connectError;
+  const resident = options.resident === true;
+  const connector = (): Promise<FakeMpvConnection> => {
+    if (connectError !== undefined) {
+      return Promise.reject(connectError);
+    }
+    if (!resident && !process.alive) {
+      return Promise.reject(new Error('ENOENT: no socket'));
+    }
+    return Promise.resolve(connection);
+  };
   const backend = new MpvPlayerBackend({
     binary: '/usr/bin/mpv',
     volume: 70,
     socketPath: () => '/tmp/test-mpv.sock',
     spawner: (binary, args) => {
       spawnCalls.push({ binary, args });
+      process.alive = true;
       return process;
     },
-    connector:
-      connectError !== undefined
-        ? () => Promise.reject(connectError)
-        : () => Promise.resolve(connection),
+    connector,
     spawnTimeoutMs: 60,
     sleep: () => Promise.resolve(),
   });
@@ -144,6 +160,16 @@ describe('MpvPlayerBackend.play', () => {
     await expect(backend.play(playRequest)).rejects.toMatchObject({
       code: 'PLAYER_SPAWN_FAILED',
     });
+  });
+
+  it('connects to a resident mpv without spawning a new process', async () => {
+    const { backend, connection, spawnCalls } = makeBackend({ resident: true });
+
+    await backend.play(playRequest);
+
+    expect(spawnCalls).toHaveLength(0);
+    expect(connection.requests).toContainEqual(['loadfile', playRequest.streamUrl]);
+    expect((await backend.getSnapshot()).status).toBe('playing');
   });
 });
 

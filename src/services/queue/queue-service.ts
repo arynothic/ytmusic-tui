@@ -27,6 +27,12 @@ import {
   type IdGenerator,
 } from '@/services/queue/queue-engine';
 
+/**
+ * Reserved name under which the live queue is persisted, so separate
+ * CLI invocations share one continuous queue.
+ */
+export const LIVE_QUEUE_NAME = '_current';
+
 /** Options for {@link QueueService}. */
 export interface QueueServiceOptions {
   readonly queueStore: QueueStore;
@@ -179,6 +185,27 @@ export class QueueService {
   /** Deletes a saved queue; missing names are not an error. */
   deleteSaved(name: string): void {
     this.#store.remove(name);
+  }
+
+  /**
+   * Loads the persisted live queue (shared across CLI invocations).
+   * Returns false when no live queue was persisted yet.
+   */
+  loadPersisted(): boolean {
+    try {
+      this.restore(LIVE_QUEUE_NAME);
+      return true;
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /** Persists the live queue for later CLI invocations. */
+  persist(): void {
+    this.saveAs(LIVE_QUEUE_NAME);
   }
 
   /** Asserts an item id exists in the live queue. */

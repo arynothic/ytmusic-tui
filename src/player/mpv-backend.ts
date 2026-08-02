@@ -48,9 +48,17 @@ export interface MpvPlayerBackendOptions {
 const OBSERVE_PAUSE = 1;
 const OBSERVE_TIME_POS = 2;
 const OBSERVE_VOLUME = 3;
-
-/** Default spawner: detached from stdio so mpv never touches the terminal. */
-const defaultSpawner: MpvSpawner = (binary, args) => spawn(binary, [...args], { stdio: 'ignore' });
+/**
+ * Default spawner: detached from stdio so mpv never touches the
+ * terminal, and unref'd so a one-shot CLI process can exit while mpv
+ * keeps playing (mpv acts as the playback daemon; later invocations
+ * reconnect through the fixed IPC socket).
+ */
+const defaultSpawner: MpvSpawner = (binary, args) => {
+  const child = spawn(binary, [...args], { stdio: 'ignore', detached: true });
+  child.unref();
+  return child;
+};
 
 /** Builds a unique IPC socket path (named pipe on Windows). */
 function defaultSocketPath(): string {
@@ -188,12 +196,24 @@ export class MpvPlayerBackend implements PlayerBackend {
     this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
   }
 
-  /** Starts mpv and connects to its IPC socket on first use. */
+  /**
+   * Connects to the resident mpv, spawning it first when needed. A
+   * previous CLI invocation may have left mpv running with the fixed
+   * IPC socket — connecting to it is what makes `ytmusic pause` work
+   * across separate processes.
+   */
   async #ensureStarted(): Promise<MpvIpcConnection> {
     if (this.#connection !== undefined) {
       return this.#connection;
     }
     const socketPath = this.#socketPath();
+    try {
+      const existing = await this.#connector(socketPath);
+      this.#attach(existing, undefined);
+      return existing;
+    } catch {
+      // No resident mpv — fall through and spawn one.
+    }
     const args = [
       '--idle=yes',
       '--no-video',
@@ -236,25 +256,54 @@ export class MpvPlayerBackend implements PlayerBackend {
     }
   }
 
-  /** Wires events from a freshly established connection. */
-  #attach(connection: MpvIpcConnection, processHandle: MpvProcessHandle): void {
+  /**
+   * Wires events from a freshly established connection. The process
+   * handle is present only when WE spawned mpv; for a resident mpv from
+   * an earlier process, only the property observations apply.
+   */
+  #attach(connection: MpvIpcConnection, processHandle: MpvProcessHandle | undefined): void {
     this.#connection = connection;
     connection.onEvent((event) => {
       this.#handleEvent(event);
     });
-    processHandle.on('exit', () => {
-      if (this.#process === processHandle) {
-        this.#process = undefined;
-        this.#connection = undefined;
-        this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
-      }
-    });
+    if (processHandle !== undefined) {
+      processHandle.on('exit', () => {
+        if (this.#process === processHandle) {
+          this.#process = undefined;
+          this.#connection = undefined;
+          this.#setSnapshot({ status: 'idle', track: null, positionSeconds: 0 });
+        }
+      });
+    }
     // Observe the properties that feed the snapshot; failures are not fatal.
     void connection.request(['observe_property', OBSERVE_PAUSE, 'pause']).catch(() => undefined);
     void connection
       .request(['observe_property', OBSERVE_TIME_POS, 'time-pos'])
       .catch(() => undefined);
     void connection.request(['observe_property', OBSERVE_VOLUME, 'volume']).catch(() => undefined);
+    // Sync with a resident player's actual state: an earlier CLI
+    // invocation may have left mpv mid-track, with its own volume and
+    // position. Track metadata itself is restored from the persisted
+    // queue by the command layer.
+    void (async () => {
+      try {
+        const [path, paused, position, volume] = await Promise.all([
+          connection.request(['get_property', 'path']),
+          connection.request(['get_property', 'pause']),
+          connection.request(['get_property', 'time-pos']),
+          connection.request(['get_property', 'volume']),
+        ]);
+        this.#setSnapshot({
+          ...(typeof volume === 'number' ? { volume: clampVolume(volume) } : {}),
+          ...(typeof position === 'number' ? { positionSeconds: Math.round(position) } : {}),
+          ...(typeof path === 'string' && path !== '' && this.#snapshot.track === null
+            ? { status: paused === true ? ('paused' as const) : ('playing' as const) }
+            : {}),
+        });
+      } catch {
+        // Resident state unavailable — the optimistic snapshot stands.
+      }
+    })();
   }
 
   /** Applies one unsolicited mpv event to the snapshot. */

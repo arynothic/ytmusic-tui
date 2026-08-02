@@ -17,6 +17,11 @@ export interface CreatePlayerBackendOptions {
   readonly mpvPath?: string;
   /** Explicit vlc binary path; overrides PATH lookup. */
   readonly vlcPath?: string;
+  /**
+   * Fixed mpv IPC socket path. Sharing one path across CLI invocations
+   * is what lets later commands control an already-playing mpv.
+   */
+  readonly mpvSocketPath?: string;
   /** Executable locator, injectable for tests. */
   readonly findExec?: typeof findExecutable;
   readonly logger?: Logger;
@@ -39,9 +44,11 @@ export async function createPlayerBackend(
   if (options.preference === 'auto' || options.preference === 'mpv') {
     const mpvBinary = options.mpvPath ?? (await find('mpv'));
     if (mpvBinary !== undefined) {
+      const socketPath = options.mpvSocketPath;
       return new MpvPlayerBackend({
         binary: mpvBinary,
         volume: options.volume,
+        ...(socketPath !== undefined ? { socketPath: () => socketPath } : {}),
         ...(options.logger !== undefined ? { logger: options.logger } : {}),
       });
     }

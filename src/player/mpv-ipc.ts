@@ -50,6 +50,8 @@ export function connectMpvIpc(
   return new Promise((resolve, reject) => {
     const socket: Socket =
       typeof address === 'string' ? createConnection(address) : createConnection(address);
+    // Never let an open socket keep a one-shot CLI process alive.
+    socket.unref();
 
     let buffer = '';
     let nextRequestId = 1;

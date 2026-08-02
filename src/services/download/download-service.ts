@@ -75,6 +75,11 @@ export class DownloadService {
     this.#logger = options.logger;
   }
 
+  /** The directory downloads are written to. */
+  get directory(): string {
+    return this.#directory;
+  }
+
   /**
    * Downloads one track and returns the resulting file path.
    * Progress is parsed from yt-dlp's `--newline` output.

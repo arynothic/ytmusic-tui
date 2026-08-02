@@ -106,7 +106,12 @@ export async function createAppContext(): Promise<AppContext> {
   );
 
   // The player backend is detected lazily so non-playback commands never
-  // pay for (or fail on) mpv/VLC detection.
+  // pay for (or fail on) mpv/VLC detection. The fixed IPC socket path is
+  // what makes mpv act as the cross-process playback daemon.
+  const mpvSocketPath =
+    process.platform === 'win32'
+      ? '\\\\.\\pipe\\ytmusic-cli-mpv'
+      : join(paths.configDir, 'mpv.sock');
   container.register(
     Tokens.PlayerBackend,
     () =>
@@ -118,6 +123,7 @@ export async function createAppContext(): Promise<AppContext> {
             volume: config.player.volume,
             ...(config.player.mpvPath !== undefined ? { mpvPath: config.player.mpvPath } : {}),
             ...(config.player.vlcPath !== undefined ? { vlcPath: config.player.vlcPath } : {}),
+            mpvSocketPath,
             logger,
           }),
       }),

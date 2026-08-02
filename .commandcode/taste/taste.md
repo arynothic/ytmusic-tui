@@ -1,0 +1,3 @@
+- Prefers concise, compact responses — asks for shorter versions when given detailed breakdowns. Confidence: 0.85
+- Prefers plain, jargon-free language when summarizing work for external audiences (e.g., CV bullet points) — "text-based UI" over "Ink/React TUI", "local caching" over "SQLite-based caching with TTL." Confidence: 0.85
+- Prefers structured, scannable output formats — bullet points and keyword lists over prose paragraphs — often specifying an exact count (e.g., "add 4 more point", "give me 6 keywords"). Confidence: 0.75

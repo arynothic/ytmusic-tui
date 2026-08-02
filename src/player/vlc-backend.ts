@@ -56,7 +56,12 @@ export interface VlcPlayerBackendOptions {
 /** VLC's RC `volume` command takes 0-256; ours is 0-100. */
 const VLC_VOLUME_SCALE = 256 / 100;
 
-const defaultSpawner: VlcSpawner = (binary, args) => spawn(binary, [...args], { stdio: 'ignore' });
+/** Default spawner: detached + unref'd so the CLI may exit mid-track. */
+const defaultSpawner: VlcSpawner = (binary, args) => {
+  const child = spawn(binary, [...args], { stdio: 'ignore', detached: true });
+  child.unref();
+  return child;
+};
 
 const defaultPoller: PollerFactory = (callback, intervalMs) => {
   const timer = setInterval(callback, intervalMs);
