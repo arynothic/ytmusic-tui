@@ -80,7 +80,10 @@ export const artistPageFixture = {
   sections: [
     { header: { title: { text: 'Top songs' } }, contents: [trackNode] },
     { header: { title: { text: 'Albums' } }, items: [albumNode] },
-    { header: { title: { text: 'Singles & EPs' } }, items: [{ ...albumNode, id: 'MPREb_single', subtitle: { text: 'Single • 2002' } }] },
+    {
+      header: { title: { text: 'Singles & EPs' } },
+      items: [{ ...albumNode, id: 'MPREb_single', subtitle: { text: 'Single • 2002' } }],
+    },
   ],
 };
 

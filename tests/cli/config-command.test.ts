@@ -70,8 +70,8 @@ describe('config command', () => {
   it('fails with ConfigError for unknown keys', async () => {
     const program = new Command();
     registerConfigCommand(program, () => createTestContext(directory));
-    await expect(program.parseAsync(['config', 'get', 'nope'], { from: 'user' })).rejects.toThrowError(
-      ConfigError,
-    );
+    await expect(
+      program.parseAsync(['config', 'get', 'nope'], { from: 'user' }),
+    ).rejects.toThrowError(ConfigError);
   });
 });

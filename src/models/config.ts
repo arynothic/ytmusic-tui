@@ -39,9 +39,7 @@ export const AppConfigSchema = z.object({
     .prefault({}),
   logging: z
     .object({
-      level: z
-        .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-        .default('info'),
+      level: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
       pretty: z.boolean().default(false),
     })
     .prefault({}),

@@ -36,7 +36,10 @@ describe('deepMerge', () => {
   });
 
   it('drops prototype-polluting keys', () => {
-    const merged = deepMerge({}, JSON.parse('{"__proto__": {"polluted": true}}') as Record<string, unknown>);
+    const merged = deepMerge(
+      {},
+      JSON.parse('{"__proto__": {"polluted": true}}') as Record<string, unknown>,
+    );
     expect(merged).toEqual({});
     expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
   });
@@ -66,7 +69,9 @@ describe('setDotted', () => {
 
 describe('flattenConfig', () => {
   it('flattens nested objects to dotted string pairs', () => {
-    expect(flattenConfig({ player: { backend: 'auto', volume: 80 }, search: { limit: 20 } })).toEqual({
+    expect(
+      flattenConfig({ player: { backend: 'auto', volume: 80 }, search: { limit: 20 } }),
+    ).toEqual({
       'player.backend': 'auto',
       'player.volume': '80',
       'search.limit': '20',

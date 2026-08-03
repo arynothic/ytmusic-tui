@@ -79,9 +79,8 @@ export class SqliteCacheStore implements CacheStore {
 
   clearExpired(): number {
     try {
-      return this.#db
-        .prepare('DELETE FROM cache_entries WHERE expires_at <= ?')
-        .run(Date.now()).changes;
+      return this.#db.prepare('DELETE FROM cache_entries WHERE expires_at <= ?').run(Date.now())
+        .changes;
     } catch (error) {
       throw new CacheError('CACHE_QUERY_FAILED', 'Failed to clear expired cache entries', {
         cause: error,

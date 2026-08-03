@@ -21,9 +21,7 @@ export default tseslint.config(
       'import-x': importX,
     },
     settings: {
-      'import-x/resolver-next': [
-        createTypeScriptImportResolver({ project: './tsconfig.json' }),
-      ],
+      'import-x/resolver-next': [createTypeScriptImportResolver({ project: './tsconfig.json' })],
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',

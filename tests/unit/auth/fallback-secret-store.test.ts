@@ -4,7 +4,10 @@ import { FallbackSecretStore } from '@/auth';
 import type { SecretStore } from '@/core/ports';
 
 /** In-memory SecretStore double with a scripted availability. */
-function createFakeStore(name: string, available: boolean): SecretStore & {
+function createFakeStore(
+  name: string,
+  available: boolean,
+): SecretStore & {
   data: Map<string, string>;
   probes: number;
 } {

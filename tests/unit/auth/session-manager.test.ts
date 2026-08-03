@@ -55,16 +55,13 @@ describe('SessionManager', () => {
     const failing = new SessionManager(store, rejecting);
 
     await expect(failing.login({ cookie: 'SID=a; SAPISID=b' })).rejects.toThrowError(AuthError);
-    await expect(failing.login({ cookie: 'SID=a; SAPISID=b' })).rejects.toThrowError(
-      /rejected/,
-    );
+    await expect(failing.login({ cookie: 'SID=a; SAPISID=b' })).rejects.toThrowError(/rejected/);
     expect(store.data.size).toBe(0);
   });
 
   it('passes through AuthErrors from the gateway unchanged', async () => {
     const rejecting = new MockMusicGateway();
-    rejecting.authenticate = () =>
-      Promise.reject(new AuthError('AUTH_SESSION_EXPIRED', 'expired'));
+    rejecting.authenticate = () => Promise.reject(new AuthError('AUTH_SESSION_EXPIRED', 'expired'));
     const failing = new SessionManager(store, rejecting);
 
     await expect(failing.login({ cookie: 'x' })).rejects.toThrowError(/expired/);

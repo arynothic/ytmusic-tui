@@ -172,10 +172,7 @@ export class YouTubeMusicGateway implements MusicGateway {
 
   async getTrack(id: VideoId): Promise<Track> {
     const client = await this.#ensureClient();
-    const response = await this.#call(
-      () => client.music.getInfo(id),
-      `Fetching track ${id}`,
-    );
+    const response = await this.#call(() => client.music.getInfo(id), `Fetching track ${id}`);
     const track = mapTrackInfo(response);
     if (track === undefined) {
       throw new ApiError('API_NOT_FOUND', `Track "${id}" not found`);
@@ -195,10 +192,7 @@ export class YouTubeMusicGateway implements MusicGateway {
 
   async getArtist(id: ArtistId): Promise<ArtistDetails> {
     const client = await this.#ensureClient();
-    const response = await this.#call(
-      () => client.music.getArtist(id),
-      `Fetching artist ${id}`,
-    );
+    const response = await this.#call(() => client.music.getArtist(id), `Fetching artist ${id}`);
     const artist = mapArtistDetails(id, response);
     if (artist === undefined) {
       throw new ApiError('API_UNEXPECTED_RESPONSE', `Artist "${id}" returned an unusable payload`);
@@ -280,10 +274,7 @@ export class YouTubeMusicGateway implements MusicGateway {
 
   async renamePlaylist(id: PlaylistId, title: string): Promise<void> {
     const client = await this.#ensureClient();
-    await this.#call(
-      () => client.playlist.setName(id, title),
-      `Renaming playlist ${id}`,
-    );
+    await this.#call(() => client.playlist.setName(id, title), `Renaming playlist ${id}`);
   }
 
   async deletePlaylist(id: PlaylistId): Promise<void> {
@@ -320,23 +311,26 @@ export class YouTubeMusicGateway implements MusicGateway {
   async #call<T>(operation: () => Promise<T>, context: string): Promise<T> {
     try {
       return await this.#limiter.execute(() =>
-        withRetry(async () => {
-          try {
-            return await operation();
-          } catch (error) {
-            throw normalizeClientError(error, context);
-          }
-        }, this.#retry ?? { isRetryable: isRetryableError, onRetry: (info) => this.#onRetry(info, context) }),
+        withRetry(
+          async () => {
+            try {
+              return await operation();
+            } catch (error) {
+              throw normalizeClientError(error, context);
+            }
+          },
+          this.#retry ?? {
+            isRetryable: isRetryableError,
+            onRetry: (info) => this.#onRetry(info, context),
+          },
+        ),
       );
     } catch (error) {
       throw normalizeClientError(error, context);
     }
   }
 
-  #onRetry(
-    info: { attempt: number; error: unknown; delayMs: number },
-    context: string,
-  ): void {
+  #onRetry(info: { attempt: number; error: unknown; delayMs: number }, context: string): void {
     this.#logger?.warn(
       { attempt: info.attempt, delayMs: info.delayMs, context },
       'retrying YouTube Music request',
@@ -347,10 +341,7 @@ export class YouTubeMusicGateway implements MusicGateway {
   async #fetchContinuation(token: string): Promise<unknown> {
     const previous = this.#continuations.get(token);
     if (previous === undefined) {
-      throw new ApiError(
-        'API_UNEXPECTED_RESPONSE',
-        'Unknown or expired search continuation token',
-      );
+      throw new ApiError('API_UNEXPECTED_RESPONSE', 'Unknown or expired search continuation token');
     }
     this.#continuations.delete(token);
     const getContinuation = (previous as { getContinuation?: unknown }).getContinuation;
@@ -428,10 +419,7 @@ export class YouTubeMusicGateway implements MusicGateway {
   }
 
   /** Maps one library shelf category using the given classifier. */
-  async #mapLibraryShelf<T>(
-    titlePattern: RegExp,
-    map: (nodes: unknown[]) => T[],
-  ): Promise<T[]> {
+  async #mapLibraryShelf<T>(titlePattern: RegExp, map: (nodes: unknown[]) => T[]): Promise<T[]> {
     const client = await this.#ensureClient();
     const response = await this.#call(() => client.music.getLibrary(), 'Fetching library');
     if (response === null || typeof response !== 'object') {

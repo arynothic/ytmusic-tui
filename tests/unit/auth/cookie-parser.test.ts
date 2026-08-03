@@ -78,7 +78,8 @@ describe('importCookies', () => {
   });
 
   it('accepts netscape file content', () => {
-    const file = '.google.com\tTRUE\t/\tFALSE\t2147483647\tSID\tsid-val\n.google.com\tTRUE\t/\tFALSE\t2147483647\tSAPISID\tsapisid-val';
+    const file =
+      '.google.com\tTRUE\t/\tFALSE\t2147483647\tSID\tsid-val\n.google.com\tTRUE\t/\tFALSE\t2147483647\tSAPISID\tsapisid-val';
     expect(importCookies(file)).toBe('SID=sid-val; SAPISID=sapisid-val');
   });
 

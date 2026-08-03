@@ -59,8 +59,7 @@ export class SqliteQueueStore implements QueueStore {
     let row: QueueRow | undefined;
     try {
       row = this.#db.prepare('SELECT snapshot FROM saved_queues WHERE name = ?').get(name) as
-        | QueueRow
-        | undefined;
+        QueueRow | undefined;
     } catch (error) {
       throw new CacheError('CACHE_QUERY_FAILED', `Failed to load queue "${name}"`, {
         cause: error,

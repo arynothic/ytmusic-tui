@@ -292,9 +292,7 @@ export function mapArtistDetails(artistId: ArtistId, response: unknown): ArtistD
     const sectionTitle = readShelfTitle(section.data) ?? '';
     const items = readShelfItems(section.data);
     if (/song/i.test(sectionTitle)) {
-      topTracks.push(
-        ...items.map(mapTrack).filter((track): track is Track => track !== undefined),
-      );
+      topTracks.push(...items.map(mapTrack).filter((track): track is Track => track !== undefined));
     } else if (/album/i.test(sectionTitle)) {
       albums.push(...items.map(mapAlbum).filter((album): album is Album => album !== undefined));
     } else if (/single|ep/i.test(sectionTitle)) {

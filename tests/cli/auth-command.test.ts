@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { registerAuthCommands } from '@/commands/auth';
@@ -28,6 +30,20 @@ describe('auth commands', () => {
     ]);
     expect(output).toContain('Logged in as Ada');
     expect(service.gateway.isAuthenticated()).toBe(true);
+  });
+
+  it('logs in with a Netscape cookies.txt --file', async () => {
+    const file = `${directory}/cookies.txt`;
+    await writeFile(
+      file,
+      [
+        '# Netscape HTTP Cookie File',
+        '.youtube.com\tTRUE\t/\tTRUE\t2000000000\tSID\tabc123',
+        '.youtube.com\tTRUE\t/\tTRUE\t2000000000\tSAPISID\tsapi456',
+      ].join('\n'),
+    );
+    const output = await runCli(registerAuthCommands, service.context, ['login', '--file', file]);
+    expect(output).toContain('Logged in as Ada');
   });
 
   it('requires cookie input when non-interactive without flags', async () => {

@@ -107,6 +107,27 @@ describe('resolve', () => {
     expect(stream.mimeType).toBe('audio/mp4');
     expect(stream.bitrateKbps).toBeUndefined();
   });
+
+  it.each([
+    [{ ext: 'mp3' }, 'audio/mpeg'],
+    [{ ext: 'ogg' }, 'audio/ogg'],
+    [{ ext: 'oga' }, 'audio/ogg'],
+    [{ ext: 'opus' }, 'audio/ogg'],
+    [{ ext: 'flac' }, 'audio/flac'],
+    [{ ext: 'unknown', acodec: 'opus' }, 'audio/webm'],
+    [{ ext: 'unknown', acodec: 'aac' }, undefined],
+  ])('maps %j to MIME type %s', async (info, expected) => {
+    const result: CommandResult = {
+      code: 0,
+      stdout: JSON.stringify({ url: 'https://x.googlevideo.com/a', ...info }),
+      stderr: '',
+      killed: false,
+    };
+    const { resolver } = makeResolver(result);
+
+    const stream = await resolver.resolve(TRACK_ID);
+    expect(stream.mimeType).toBe(expected);
+  });
 });
 
 describe('cache behavior', () => {

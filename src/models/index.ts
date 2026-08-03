@@ -1,7 +1,13 @@
 export { AlbumSchema, AlbumDetailsSchema, type Album, type AlbumDetails } from '@/models/album';
 export { ArtistSchema, type Artist } from '@/models/artist';
 export { ArtistDetailsSchema, type ArtistDetails } from '@/models/artist-details';
-export { AppConfigSchema, DEFAULT_CONFIG, type AppConfig, type LogLevel, type PlayerBackendPreference } from '@/models/config';
+export {
+  AppConfigSchema,
+  DEFAULT_CONFIG,
+  type AppConfig,
+  type LogLevel,
+  type PlayerBackendPreference,
+} from '@/models/config';
 export { CredentialsSchema, type Credentials } from '@/models/credentials';
 export { HistoryEntrySchema, type HistoryEntry } from '@/models/history';
 export {
@@ -39,6 +45,11 @@ export {
   type RepeatMode,
   type SavedQueueInfo,
 } from '@/models/queue';
-export { SearchFilterSchema, SearchResultsSchema, type SearchFilter, type SearchResults } from '@/models/search';
+export {
+  SearchFilterSchema,
+  SearchResultsSchema,
+  type SearchFilter,
+  type SearchResults,
+} from '@/models/search';
 export { ResolvedStreamSchema, type ResolvedStream } from '@/models/stream';
 export { AlbumRefSchema, TrackSchema, type AlbumRef, type Track } from '@/models/track';

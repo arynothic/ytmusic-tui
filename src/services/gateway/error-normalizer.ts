@@ -1,9 +1,4 @@
-import {
-  ApiError,
-  AppError,
-  AuthError,
-  NetworkError,
-} from '@/core/errors';
+import { ApiError, AppError, AuthError, NetworkError } from '@/core/errors';
 
 /** Extracts a 4xx/5xx HTTP status code from an error message, when present. */
 function extractStatusCode(message: string): number | undefined {

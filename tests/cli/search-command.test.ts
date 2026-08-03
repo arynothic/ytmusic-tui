@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { registerSearchCommand } from '@/commands/search';
 import { ValidationError } from '@/core/errors';
 
-import { createTrackFixture } from '../helpers/fixtures';
+import {
+  createAlbumDetailsFixture,
+  createArtistDetailsFixture,
+  createTrackFixture,
+} from '../helpers/fixtures';
 import { createTempDir, removeTempDir } from '../helpers/temp-dir';
 import { createServiceTestContext, type ServiceTestContext } from '../helpers/test-context';
 import { runCli } from './helpers';
@@ -19,6 +23,9 @@ describe('search command', () => {
         createTrackFixture({ id: 'v1', title: 'Fix You', durationSeconds: 295 }),
         createTrackFixture({ id: 'v2', title: 'Yellow', durationSeconds: 269 }),
       ],
+      albums: [createAlbumDetailsFixture({ id: 'AL1', title: 'Fix Tapes' })],
+      artists: [createArtistDetailsFixture({ id: 'AR1', name: 'The Fixers' })],
+      playlists: [],
     });
   });
 
@@ -31,6 +38,27 @@ describe('search command', () => {
     expect(output).toContain('Results for "Fix You"');
     expect(output).toContain('Fix You');
     expect(output).toContain('4:55');
+  });
+
+  it('prints album and artist sections for mixed searches', async () => {
+    const output = await runCli(registerSearchCommand, service.context, ['search', 'Fix']);
+    expect(output).toContain('Songs');
+    expect(output).toContain('Albums');
+    expect(output).toContain('Fix Tapes');
+    expect(output).toContain('Artists');
+    expect(output).toContain('The Fixers');
+  });
+
+  it('prints only the requested section with --type', async () => {
+    const output = await runCli(registerSearchCommand, service.context, [
+      'search',
+      'Fix',
+      '--type',
+      'albums',
+    ]);
+    expect(output).toContain('(albums)');
+    expect(output).toContain('Fix Tapes');
+    expect(output).not.toContain('Songs');
   });
 
   it('warns when nothing matches', async () => {

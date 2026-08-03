@@ -54,7 +54,10 @@ export function connectVlcRc(
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? '';
       for (const line of lines) {
-        const trimmed = line.trim();
+        // Without --rc-quiet, VLC prefixes output with its "> " prompt,
+        // which can merge into a response line when it was buffered.
+        const withoutPrompt = line.startsWith('> ') ? line.slice(2) : line;
+        const trimmed = withoutPrompt.trim();
         if (trimmed === '' || NOISE_PATTERN.test(trimmed)) {
           continue;
         }

@@ -1,13 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest';
 
-import type {
-  Awaitable,
-  Constructor,
-  DeepReadonly,
-  Maybe,
-  Nullable,
-  Prettify,
-} from '@/types';
+import type { Awaitable, Constructor, DeepReadonly, Maybe, Nullable, Prettify } from '@/types';
 
 describe('utility types', () => {
   it('Maybe allows value, null and undefined', () => {

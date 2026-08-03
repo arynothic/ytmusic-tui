@@ -15,7 +15,11 @@ export function registerConfigCommand(program: Command, getContext: ContextFacto
 
   const config = program.command('config').description('View and manage configuration');
 
-  config.command('list').alias('ls').description('Print the effective configuration').action(showConfig);
+  config
+    .command('list')
+    .alias('ls')
+    .description('Print the effective configuration')
+    .action(showConfig);
 
   config
     .command('path')

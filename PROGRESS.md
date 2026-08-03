@@ -50,9 +50,11 @@ models/ types/ utils/  (leaf modules — imported by all, import nothing in src)
 | 9   | services/ app layer: queue-engine (pure) + QueueService, PlaybackService (auto-advance), Search/Library/Playlist/Lyrics/Download/Auth services, LazyPlayerBackend, full context wiring, MockQueueStore/MockHistoryStore                           | 401         |
 | 10  | UI kit (tables, highlight, spinner, picker) + all commands (search/play/artist/album/playlist/queue/controls/now/lyrics/auth/cache/download), mpv-as-daemon cross-process playback, keytar CJS interop fix, CLI test harness (ServiceTestContext) | 443         |
 | 11  | cli/tui/ Ink full-screen mode: NowPlayingPanel w/ progress bar, scrollable QueuePanel, SearchPanel, keybindings, `tui` command, ink-testing-library tests                                                                                         | 449         |
+| 12  | README/CONTRIBUTING/CHANGELOG, coverage push to ≥90% lines (context/vlc-rc/pipe-safety/ttl/sleep/pick/spinner/ui-kit/command tests), coverage thresholds enforced, VLC RC prompt-prefix parsing fix                                               | 493         |
 
-Current: **449 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
-`pnpm typecheck/lint/test/build` all green. `dist/cli.js` smoke-tested (offline commands + non-TTY TUI guard).
+**PROJECT COMPLETE (v0.1.0).** Current: **493 tests passing** (incl. 1 real-mpv integration test),
+coverage **92.3% lines / 91.9% stmts / 92.4% funcs / 81.2% branches** (thresholds enforced:
+≥90/90/90/80), `pnpm typecheck/lint/format:check/test/build` all green, `dist/cli.js` smoke-tested.
 
 ### Lessons from increment 11 (don't relearn)
 
@@ -69,7 +71,8 @@ Current: **449 tests passing** (incl. 1 real-mpv integration test, auto-skipped 
 
 ## Next increments
 
-12. README/CONTRIBUTING/CHANGELOG, coverage thresholds ≥90%, final verification
+None — all 12 increments done. See README.md / CONTRIBUTING.md / CHANGELOG.md (this log
+is kept as historical record of design decisions).
 
 ### Lessons from increment 10 (don't relearn)
 

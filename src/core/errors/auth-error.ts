@@ -3,10 +3,7 @@ import { ExitCode } from '@/core/errors/exit-code';
 
 /** Machine-readable codes for authentication/authorization failures. */
 export type AuthErrorCode =
-  | 'AUTH_REQUIRED'
-  | 'AUTH_INVALID_CREDENTIALS'
-  | 'AUTH_SESSION_EXPIRED'
-  | 'AUTH_STORE_UNAVAILABLE';
+  'AUTH_REQUIRED' | 'AUTH_INVALID_CREDENTIALS' | 'AUTH_SESSION_EXPIRED' | 'AUTH_STORE_UNAVAILABLE';
 
 /** Raised for login, credential storage, and session failures. */
 export class AuthError extends AppError {

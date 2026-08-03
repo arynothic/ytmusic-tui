@@ -60,9 +60,13 @@ export async function loadConfig(options: LoadConfigOptions = {}): Promise<Loade
   try {
     envOverrides = collectEnvOverrides(envReader);
   } catch (error) {
-    throw new ConfigError('CONFIG_INVALID', error instanceof Error ? error.message : String(error), {
-      cause: error,
-    });
+    throw new ConfigError(
+      'CONFIG_INVALID',
+      error instanceof Error ? error.message : String(error),
+      {
+        cause: error,
+      },
+    );
   }
 
   const merged = deepMerge(fileConfig, envOverrides);

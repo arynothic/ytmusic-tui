@@ -134,9 +134,7 @@ export class YtDlpStreamResolver implements StreamResolver {
       url,
       expiresAt,
       ...(abr !== undefined ? { bitrateKbps: Math.round(abr) } : {}),
-      ...(guessMimeType(ext, acodec) !== undefined
-        ? { mimeType: guessMimeType(ext, acodec) }
-        : {}),
+      ...(guessMimeType(ext, acodec) !== undefined ? { mimeType: guessMimeType(ext, acodec) } : {}),
     });
   }
 }

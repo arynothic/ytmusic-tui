@@ -57,9 +57,7 @@ export const ListItemSchema = z.object({
   id: z.string().optional(),
   title: z.unknown().optional(),
   item_type: z.string().optional(),
-  duration: z
-    .object({ text: z.string().optional(), seconds: z.number().optional() })
-    .optional(),
+  duration: z.object({ text: z.string().optional(), seconds: z.number().optional() }).optional(),
   album: z.object({ id: z.string().optional(), name: z.string().optional() }).optional(),
   artists: z
     .array(z.object({ name: z.string().optional(), channel_id: z.string().optional() }))
@@ -135,7 +133,10 @@ export function collectListItems(node: unknown, depth = 0): unknown[] {
     return node.flatMap((child) => collectListItems(child, depth + 1));
   }
   const asShelf = ShelfSchema.safeParse(node);
-  if (asShelf.success && (asShelf.data.contents !== undefined || asShelf.data.items !== undefined)) {
+  if (
+    asShelf.success &&
+    (asShelf.data.contents !== undefined || asShelf.data.items !== undefined)
+  ) {
     return collectListItems(readShelfItems(asShelf.data), depth + 1);
   }
   const asItem = ListItemSchema.safeParse(node);

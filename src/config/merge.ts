@@ -21,7 +21,8 @@ export function deepMerge(target: PlainObject, source: PlainObject): PlainObject
       continue;
     }
     const existing = result[key];
-    result[key] = isPlainObject(existing) && isPlainObject(value) ? deepMerge(existing, value) : value;
+    result[key] =
+      isPlainObject(existing) && isPlainObject(value) ? deepMerge(existing, value) : value;
   }
   return result;
 }
@@ -32,7 +33,10 @@ export function deepMerge(target: PlainObject, source: PlainObject): PlainObject
  */
 export function setDotted(target: PlainObject, path: string, value: unknown): void {
   const segments = path.split('.');
-  invariant(segments.every((segment) => segment.length > 0), `Invalid dotted path "${path}"`);
+  invariant(
+    segments.every((segment) => segment.length > 0),
+    `Invalid dotted path "${path}"`,
+  );
   let current: PlainObject = target;
   for (const segment of segments.slice(0, -1)) {
     invariant(!DANGEROUS_KEYS.has(segment), `Refusing to write "${segment}"`);

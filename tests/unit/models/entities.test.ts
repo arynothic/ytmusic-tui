@@ -129,7 +129,12 @@ describe('SearchResultsSchema', () => {
 
 describe('Queue schemas', () => {
   it('creates an empty queue', () => {
-    expect(createEmptyQueue()).toEqual({ items: [], currentIndex: -1, shuffle: false, repeat: 'off' });
+    expect(createEmptyQueue()).toEqual({
+      items: [],
+      currentIndex: -1,
+      shuffle: false,
+      repeat: 'off',
+    });
   });
 
   it('parses a queue with items', () => {
@@ -165,7 +170,9 @@ describe('CredentialsSchema', () => {
     expect(() =>
       CredentialsSchema.parse({ cookie: '', savedAt: '2026-07-20T10:00:00.000Z' }),
     ).toThrowError();
-    expect(() => CredentialsSchema.parse({ cookie: 'SID=abc', savedAt: 'yesterday' })).toThrowError();
+    expect(() =>
+      CredentialsSchema.parse({ cookie: 'SID=abc', savedAt: 'yesterday' }),
+    ).toThrowError();
   });
 });
 

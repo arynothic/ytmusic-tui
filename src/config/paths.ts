@@ -30,7 +30,9 @@ export function resolveAppPaths(options: ResolvePathsOptions = {}): AppPaths {
   const xdg = options.xdgConfigHome;
   const configDir =
     options.configHomeOverride ??
-    (xdg !== undefined && xdg !== '' ? join(xdg, 'ytmusic-cli') : join(homeDir, '.config', 'ytmusic-cli'));
+    (xdg !== undefined && xdg !== ''
+      ? join(xdg, 'ytmusic-cli')
+      : join(homeDir, '.config', 'ytmusic-cli'));
   return {
     configDir,
     configFile: join(configDir, 'config.json'),

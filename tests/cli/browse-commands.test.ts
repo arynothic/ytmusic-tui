@@ -95,4 +95,10 @@ describe('download command', () => {
     expect(service.downloadRun.calls).toHaveLength(1);
     expect(service.downloadRun.calls[0]?.args.join(' ')).toContain('watch?v=v1');
   });
+
+  it('warns when nothing matches', async () => {
+    const output = await runCli(registerDownloadCommand, service.context, ['download', 'zzzz']);
+    expect(output).toContain('No tracks found');
+    expect(service.downloadRun.calls).toHaveLength(0);
+  });
 });

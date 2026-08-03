@@ -60,7 +60,10 @@ describe('loadConfig', () => {
   });
 
   it('expands a leading ~/ in the download directory', async () => {
-    await writeFile(join(directory, 'config.json'), JSON.stringify({ download: { directory: '~/Tunes' } }));
+    await writeFile(
+      join(directory, 'config.json'),
+      JSON.stringify({ download: { directory: '~/Tunes' } }),
+    );
     const { config } = await loadConfig({
       paths: pathsFor(directory),
       envReader: nullEnvReader,
