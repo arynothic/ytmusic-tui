@@ -1,7 +1,12 @@
-import { deletePassword, getPassword, setPassword } from 'keytar';
+// keytar is a CommonJS native module; Node's ESM-CJS interop cannot
+// detect its named exports, so a default import + destructure is required
+// (named imports work in vitest/tsx but fail in the bundled dist).
+import keytar from 'keytar';
 
 import { AuthError } from '@/core/errors';
 import type { SecretStore } from '@/core/ports';
+
+const { deletePassword, getPassword, setPassword } = keytar;
 
 const SERVICE_NAME = 'ytmusic-cli';
 

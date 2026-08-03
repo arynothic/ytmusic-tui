@@ -6,11 +6,31 @@ exports[`program > prints help 1`] = `
 A fast, modern terminal client for YouTube Music
 
 Options:
-  -V, --version   output the version number
-  -h, --help      display help for command
+  -V, --version             output the version number
+  -h, --help                display help for command
 
 Commands:
-  config          View and manage configuration
-  help [command]  display help for command
+  search [options] <query>  Search YouTube Music
+  play [options] <query>    Search for a song and play it (remaining results
+                            become the queue)
+  artist <name>             Show an artist page: top songs, albums and singles
+  album <name>              Show an album with its tracks
+  playlist                  Manage your playlists
+  queue                     Inspect and manage the play queue
+  pause                     Pause playback
+  resume                    Resume playback
+  stop                      Stop playback
+  next                      Play the next queued track
+  previous|prev             Play the previous queued track
+  volume <level>            Set the playback volume
+  seek <seconds>            Seek within the current track
+  now                       Show the currently playing track
+  lyrics [query]            Print lyrics for the current or searched track
+  download <query>          Download a track as an audio file (requires yt-dlp)
+  login [options]           Log in to YouTube Music with browser cookies
+  logout                    Log out and remove stored credentials
+  cache                     Manage the local cache
+  config                    View and manage configuration
+  help [command]            display help for command
 "
 `;

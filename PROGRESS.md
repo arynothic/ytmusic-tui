@@ -36,21 +36,51 @@ models/ types/ utils/  (leaf modules — imported by all, import nothing in src)
 
 ## Increments completed (each verified: typecheck + lint + tests + build)
 
-| #   | Scope                                                                                                                                                                                                                      | Tests after |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 1   | Scaffold: package.json, tsconfig(strict), tsup, vitest, eslint(typed, no-cycle), prettier, husky, lint-staged, CI/dependabot/renovate, editorconfig                                                                        | 2           |
-| 2   | types/ (utility types), core/errors/ (AppError taxonomy, invariant, retryable, normalize), utils/ (sleep, retry w/ jitter, token-bucket limiter, time, exec, env, logger)                                                  | 73          |
-| 3   | models/ (zod: Track/Album/Artist/Playlist/Lyrics/Queue/Search/Config/Credentials/Stream/History, branded IDs, acyclic graph), core/ports/ (7 interfaces), DI container + tokens                                            | 98          |
-| 4   | config/ (XDG paths, cosmiconfig loader, env overrides, ConfigService), composition root, `ytmusic config` cmd, fatal-error handler, EPIPE safety                                                                           | 138         |
-| 5   | cache/ (openDatabase, migrations via user_version, ttl), repositories/ (SqliteCacheStore/HistoryStore/QueueStore, corrupt-row self-healing)                                                                                | 163         |
-| 6   | auth/ (KeytarSecretStore, FileSecretStore 0600 atomic+mutex, FallbackSecretStore, cookie parser header+Netscape, SessionManager), MockMusicGateway test backbone                                                           | 200         |
-| 7a  | services/gateway/ (MusicClient narrow iface, loose zod mappers, error-normalizer, YouTubeMusicGateway w/ rate-limit+retry+continuation tokens), services/stream/ (YtDlpStreamResolver w/ SQLite URL cache), context wiring | 235         |
-| 7b  | Gateway + stream-resolver test suites (fake MusicClient, continuation roundtrip, shelf classification, playlist CRUD, yt-dlp parse/cache/failure modes)                                                                    | 289         |
-| 8   | player/ (mpv JSON IPC backend + reconnect/spawn lifecycle, VLC RC fallback backend, availability factory), MockPlayerBackend, real-mpv integration smoke test                                                              | 331         |
-| 9   | services/ app layer: queue-engine (pure) + QueueService, PlaybackService (auto-advance), Search/Library/Playlist/Lyrics/Download/Auth services, LazyPlayerBackend, full context wiring, MockQueueStore/MockHistoryStore    | 401         |
+| #   | Scope                                                                                                                                                                                                                                             | Tests after |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | Scaffold: package.json, tsconfig(strict), tsup, vitest, eslint(typed, no-cycle), prettier, husky, lint-staged, CI/dependabot/renovate, editorconfig                                                                                               | 2           |
+| 2   | types/ (utility types), core/errors/ (AppError taxonomy, invariant, retryable, normalize), utils/ (sleep, retry w/ jitter, token-bucket limiter, time, exec, env, logger)                                                                         | 73          |
+| 3   | models/ (zod: Track/Album/Artist/Playlist/Lyrics/Queue/Search/Config/Credentials/Stream/History, branded IDs, acyclic graph), core/ports/ (7 interfaces), DI container + tokens                                                                   | 98          |
+| 4   | config/ (XDG paths, cosmiconfig loader, env overrides, ConfigService), composition root, `ytmusic config` cmd, fatal-error handler, EPIPE safety                                                                                                  | 138         |
+| 5   | cache/ (openDatabase, migrations via user_version, ttl), repositories/ (SqliteCacheStore/HistoryStore/QueueStore, corrupt-row self-healing)                                                                                                       | 163         |
+| 6   | auth/ (KeytarSecretStore, FileSecretStore 0600 atomic+mutex, FallbackSecretStore, cookie parser header+Netscape, SessionManager), MockMusicGateway test backbone                                                                                  | 200         |
+| 7a  | services/gateway/ (MusicClient narrow iface, loose zod mappers, error-normalizer, YouTubeMusicGateway w/ rate-limit+retry+continuation tokens), services/stream/ (YtDlpStreamResolver w/ SQLite URL cache), context wiring                        | 235         |
+| 7b  | Gateway + stream-resolver test suites (fake MusicClient, continuation roundtrip, shelf classification, playlist CRUD, yt-dlp parse/cache/failure modes)                                                                                           | 289         |
+| 8   | player/ (mpv JSON IPC backend + reconnect/spawn lifecycle, VLC RC fallback backend, availability factory), MockPlayerBackend, real-mpv integration smoke test                                                                                     | 331         |
+| 9   | services/ app layer: queue-engine (pure) + QueueService, PlaybackService (auto-advance), Search/Library/Playlist/Lyrics/Download/Auth services, LazyPlayerBackend, full context wiring, MockQueueStore/MockHistoryStore                           | 401         |
+| 10  | UI kit (tables, highlight, spinner, picker) + all commands (search/play/artist/album/playlist/queue/controls/now/lyrics/auth/cache/download), mpv-as-daemon cross-process playback, keytar CJS interop fix, CLI test harness (ServiceTestContext) | 443         |
 
-Current: **401 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
-`pnpm typecheck/lint/test/build` all green.
+Current: **443 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
+`pnpm typecheck/lint/test/build` all green. `dist/cli.js` smoke-tested (--version/config/queue/now/cache).
+
+### Lessons from increment 10 (don't relearn)
+
+- **Playback daemon = mpv itself.** Fixed IPC socket path (config dir / named pipe on win32);
+  every CLI invocation connects first, spawns (detached+unref) only when unreachable.
+  `socket.unref()` + `child.unref()` let one-shot processes exit while mpv plays on.
+  Resident-state sync on attach: `path`/`pause`/`time-pos`/`volume` (track metadata comes
+  from the persisted queue). Only end-file `reason=eof|error` → idle (replace/stop/quit filtered).
+- Live queue persists across processes via QueueStore name `_current`; commands load+persist.
+- keytar is CJS: named ESM imports work in vitest but crash in bundled dist — use default
+  import + destructure. ALWAYS smoke-test `dist/cli.js`, not just vitest.
+- ora: `isEnabled: process.stdout.isTTY` keeps piped output clean (no custom no-op needed).
+- `Partial<PlayerSnapshot>` keeps readonly — build patches with conditional spreads.
+- CLI command tests: register commands on fresh Command + ServiceTestContext (container wired
+  with mocks); non-TTY means pickers return first result and login requires flags.
+
+## Commands working today
+
+`search play artist album playlist queue pause resume stop next previous volume seek now lyrics download login logout cache config` (+ `--help`/`--version`).
+
+## Next increments
+
+11. cli/tui/ Ink full-screen mode + hooks
+12. README/CONTRIBUTING/CHANGELOG, coverage thresholds ≥90%, final verification
+
+Test doubles ready: `tests/mocks/mock-music-gateway.ts`, `tests/mocks/mock-cache-store.ts`,
+`tests/mocks/mock-player-backend.ts`, `tests/mocks/mock-queue-store.ts`,
+`tests/mocks/mock-history-store.ts`,
+`tests/helpers/` (temp-dir, test-context w/ stdout+stderr capture, fixtures, ServiceTestContext).
 
 ### Lessons from increment 7 (don't relearn)
 
@@ -78,10 +108,6 @@ Current: **401 tests passing** (incl. 1 real-mpv integration test, auto-skipped 
 - Getter-in-harness gotcha: destructuring a lazy getter evaluates it immediately —
   access `harness.pollCallback` AFTER `play()`, not via destructure.
 - Server-push assertions need `vi.waitFor` (TCP delivery is async even on loopback).
-
-## Commands working today
-
-`ytmusic config [list|get|set|path]`, `--help`, `--version`.
 
 ## Decisions log
 

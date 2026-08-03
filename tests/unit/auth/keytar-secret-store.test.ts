@@ -8,7 +8,7 @@ const keytarMock = vi.hoisted(() => ({
   deletePassword: vi.fn<(service: string, account: string) => Promise<boolean>>(),
 }));
 
-vi.mock('keytar', () => keytarMock);
+vi.mock('keytar', () => ({ default: keytarMock }));
 
 import { KeytarSecretStore } from '@/auth/keytar-secret-store';
 

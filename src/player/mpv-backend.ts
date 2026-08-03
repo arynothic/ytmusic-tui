@@ -293,13 +293,25 @@ export class MpvPlayerBackend implements PlayerBackend {
           connection.request(['get_property', 'time-pos']),
           connection.request(['get_property', 'volume']),
         ]);
-        this.#setSnapshot({
-          ...(typeof volume === 'number' ? { volume: clampVolume(volume) } : {}),
-          ...(typeof position === 'number' ? { positionSeconds: Math.round(position) } : {}),
-          ...(typeof path === 'string' && path !== '' && this.#snapshot.track === null
-            ? { status: paused === true ? ('paused' as const) : ('playing' as const) }
-            : {}),
-        });
+        const syncedVolume = typeof volume === 'number' ? clampVolume(volume) : undefined;
+        const syncedPosition = typeof position === 'number' ? Math.round(position) : undefined;
+        const syncedStatus =
+          typeof path === 'string' && path !== '' && this.#snapshot.track === null
+            ? paused === true
+              ? ('paused' as const)
+              : ('playing' as const)
+            : undefined;
+        if (
+          syncedVolume !== undefined ||
+          syncedPosition !== undefined ||
+          syncedStatus !== undefined
+        ) {
+          this.#setSnapshot({
+            ...(syncedVolume !== undefined ? { volume: syncedVolume } : {}),
+            ...(syncedPosition !== undefined ? { positionSeconds: syncedPosition } : {}),
+            ...(syncedStatus !== undefined ? { status: syncedStatus } : {}),
+          });
+        }
       } catch {
         // Resident state unavailable — the optimistic snapshot stands.
       }
