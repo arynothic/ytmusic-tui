@@ -26,6 +26,7 @@ Commands:
   seek <seconds>            Seek within the current track
   now                       Show the currently playing track
   lyrics [query]            Print lyrics for the current or searched track
+  tui                       Open the full-screen terminal UI
   download <query>          Download a track as an audio file (requires yt-dlp)
   login [options]           Log in to YouTube Music with browser cookies
   logout                    Log out and remove stored credentials

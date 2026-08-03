@@ -13,6 +13,7 @@ import { registerPlayCommand } from '@/commands/play';
 import { registerPlaylistCommand } from '@/commands/playlist';
 import { registerQueueCommand } from '@/commands/queue';
 import { registerSearchCommand } from '@/commands/search';
+import { registerTuiCommand } from '@/commands/tui';
 
 /** Canonical name of the CLI binary. */
 export const CLI_NAME = 'ytmusic';
@@ -40,6 +41,7 @@ export function createProgram(getContext: ContextFactory): Command {
   registerControlCommands(program, getContext);
   registerNowCommand(program, getContext);
   registerLyricsCommand(program, getContext);
+  registerTuiCommand(program, getContext);
   registerDownloadCommand(program, getContext);
   registerAuthCommands(program, getContext);
   registerCacheCommand(program, getContext);

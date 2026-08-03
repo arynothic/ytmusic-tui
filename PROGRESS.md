@@ -49,9 +49,27 @@ models/ types/ utils/  (leaf modules — imported by all, import nothing in src)
 | 8   | player/ (mpv JSON IPC backend + reconnect/spawn lifecycle, VLC RC fallback backend, availability factory), MockPlayerBackend, real-mpv integration smoke test                                                                                     | 331         |
 | 9   | services/ app layer: queue-engine (pure) + QueueService, PlaybackService (auto-advance), Search/Library/Playlist/Lyrics/Download/Auth services, LazyPlayerBackend, full context wiring, MockQueueStore/MockHistoryStore                           | 401         |
 | 10  | UI kit (tables, highlight, spinner, picker) + all commands (search/play/artist/album/playlist/queue/controls/now/lyrics/auth/cache/download), mpv-as-daemon cross-process playback, keytar CJS interop fix, CLI test harness (ServiceTestContext) | 443         |
+| 11  | cli/tui/ Ink full-screen mode: NowPlayingPanel w/ progress bar, scrollable QueuePanel, SearchPanel, keybindings, `tui` command, ink-testing-library tests                                                                                         | 449         |
 
-Current: **443 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
-`pnpm typecheck/lint/test/build` all green. `dist/cli.js` smoke-tested (--version/config/queue/now/cache).
+Current: **449 tests passing** (incl. 1 real-mpv integration test, auto-skipped without mpv+ffmpeg),
+`pnpm typecheck/lint/test/build` all green. `dist/cli.js` smoke-tested (offline commands + non-TTY TUI guard).
+
+### Lessons from increment 11 (don't relearn)
+
+- Ink `useInput` handlers close over render state — rapid sequential keypresses read STALE
+  state. Mirror mutable state into a ref (`stateRef.current = {...}` each render) and read
+  refs in handlers; for player status, ask the service (`playback.now()`) instead of React state.
+- Tests must sync on rendered frames between dependent keypresses (React re-render → ref update
+  is async): write '/', waitFor 'Search:', then type.
+- TUI quit leaves mpv playing (resident daemon); the command just persists the queue and exits.
+
+## Commands working today
+
+`search play artist album playlist queue pause resume stop next previous volume seek now lyrics download login logout cache config tui` (+ `--help`/`--version`).
+
+## Next increments
+
+12. README/CONTRIBUTING/CHANGELOG, coverage thresholds ≥90%, final verification
 
 ### Lessons from increment 10 (don't relearn)
 
