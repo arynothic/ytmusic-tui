@@ -6,6 +6,7 @@ import {
   parseCookieHeader,
   parseNetscapeCookieFile,
   serializeCookieJar,
+  serializeNetscapeCookieFile,
 } from '@/auth';
 import { ValidationError } from '@/core/errors';
 
@@ -69,6 +70,25 @@ describe('buildSessionCookie', () => {
     expect(() => buildSessionCookie({ SID: 'a' })).toThrowError(ValidationError);
     expect(() => buildSessionCookie({ SID: 'a' })).toThrowError(/SAPISID/);
     expect(() => buildSessionCookie({ SAPISID: 'b' })).toThrowError(/SID/);
+  });
+});
+
+describe('serializeNetscapeCookieFile', () => {
+  it('emits tab-separated lines for youtube and google domains', () => {
+    const output = serializeNetscapeCookieFile({ SID: 'abc', HSID: 'def' }, 1_700_000_000_000);
+    const lines = output.trim().split('\n');
+    expect(lines[0]).toBe('# Netscape HTTP Cookie File');
+    expect(lines).toContain(
+      ['.youtube.com', 'TRUE', '/', 'TRUE', '1731536000', 'SID', 'abc'].join('\t'),
+    );
+    expect(lines).toContain(
+      ['.google.com', 'TRUE', '/', 'TRUE', '1731536000', 'HSID', 'def'].join('\t'),
+    );
+  });
+
+  it('round-trips through the Netscape parser', () => {
+    const jar = { SID: 'a', SAPISID: 'b' };
+    expect(parseNetscapeCookieFile(serializeNetscapeCookieFile(jar))).toEqual(jar);
   });
 });
 

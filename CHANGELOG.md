@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-10-01
+
+### Added
+
+- **Playback authentication without pasting cookies.** The new
+  `youtube.cookiesFrom` setting makes yt-dlp reuse an existing browser
+  YouTube session (`--cookies-from-browser chrome|firefox|brave|edge|chromium`).
+  A stored `ytmusic login` is used automatically as a fallback, so anonymous
+  "Sign in to confirm you're not a bot" blocks can be resolved without copying
+  anything.
+
+### Changed
+
+- Stream-resolution failures now explain YouTube's bot check and HTTP 429 rate
+  limiting with actionable next steps instead of a raw yt-dlp warning wall.
+
 ## [0.1.1] - 2026-10-01
 
 ### Changed
@@ -73,5 +89,6 @@ Initial release.
   `Tab` to enqueue and `Esc` to go back, plus inline error reporting and a
   terminal-height-aware layout.
 
+[0.1.2]: https://github.com/arynothic/ytmusic-cli/releases/tag/v0.1.2
 [0.1.1]: https://github.com/arynothic/ytmusic-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/arynothic/ytmusic-cli/releases/tag/v0.1.0

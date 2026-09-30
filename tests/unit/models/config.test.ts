@@ -14,6 +14,7 @@ describe('AppConfigSchema', () => {
       },
       download: { audioFormat: 'bestaudio' },
       search: { limit: 20 },
+      youtube: { cookiesFrom: '' },
       logging: { level: 'info', pretty: false },
       rateLimit: { requestsPerSecond: 5 },
     });

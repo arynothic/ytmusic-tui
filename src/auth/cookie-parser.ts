@@ -33,6 +33,25 @@ export function serializeCookieJar(jar: CookieJar): string {
     .join('; ');
 }
 
+/** One year, used as the expiry for cookies exported to a Netscape file. */
+const NETSCAPE_TTL_SECONDS = 365 * 24 * 60 * 60;
+
+/**
+ * Serializes a jar into the Netscape `cookies.txt` format yt-dlp's
+ * `--cookies` reads. Cookies are emitted for both `.youtube.com` and
+ * `.google.com`, since a Google session spans both.
+ */
+export function serializeNetscapeCookieFile(jar: CookieJar, now = Date.now()): string {
+  const expires = Math.floor(now / 1000) + NETSCAPE_TTL_SECONDS;
+  const lines = ['# Netscape HTTP Cookie File'];
+  for (const domain of ['.youtube.com', '.google.com']) {
+    for (const [name, value] of Object.entries(jar)) {
+      lines.push([domain, 'TRUE', '/', 'TRUE', String(expires), name, value].join('\t'));
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 /**
  * Parses a Netscape cookies.txt export into a jar. Only Google/YouTube
  * domain cookies are kept; comments and malformed lines are skipped.

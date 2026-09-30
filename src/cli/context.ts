@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import type { Database } from '@/cache/sqlite';
 import type { Logger } from 'pino';
 
-import { createSecretStore, SessionManager } from '@/auth';
+import {
+  createSecretStore,
+  parseCookieHeader,
+  serializeNetscapeCookieFile,
+  SessionManager,
+} from '@/auth';
 import {
   ConfigService,
   ensureConfigDirectory,
@@ -95,15 +100,22 @@ export async function createAppContext(): Promise<AppContext> {
         logger,
       }),
   );
-  container.register(
-    Tokens.StreamResolver,
-    (c) =>
-      new YtDlpStreamResolver({
-        cacheStore: c.resolve(Tokens.CacheStore),
-        streamTtlMs: config.cache.streamTtlSeconds * 1000,
-        logger,
-      }),
-  );
+  container.register(Tokens.StreamResolver, (c) => {
+    const sessionManager = c.resolve(Tokens.SessionManager);
+    return new YtDlpStreamResolver({
+      cacheStore: c.resolve(Tokens.CacheStore),
+      streamTtlMs: config.cache.streamTtlSeconds * 1000,
+      ...(config.youtube.cookiesFrom !== '' ? { cookiesFrom: config.youtube.cookiesFrom } : {}),
+      // No browser configured: reuse a stored login, if any. No pasting.
+      cookieProvider: async () => {
+        const credentials = await sessionManager.loadCredentials().catch(() => undefined);
+        return credentials === undefined
+          ? undefined
+          : serializeNetscapeCookieFile(parseCookieHeader(credentials.cookie));
+      },
+      logger,
+    });
+  });
 
   // The player backend is detected lazily so non-playback commands never
   // pay for (or fail on) mpv/VLC detection. The fixed IPC socket path is

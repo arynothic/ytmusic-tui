@@ -1,6 +1,6 @@
 {
   "name": "ytmusic-tui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A fast, modern terminal client for YouTube Music",
   "keywords": [
     "youtube-music",

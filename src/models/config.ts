@@ -37,6 +37,18 @@ export const AppConfigSchema = z.object({
       limit: z.number().int().min(1).max(50).default(20),
     })
     .prefault({}),
+  youtube: z
+    .object({
+      /**
+       * Browser whose existing YouTube session yt-dlp should reuse for
+       * stream resolution, e.g. "chrome", "firefox", "brave", "edge",
+       * "opera", "chromium", or "firefox:/path/to/profile". Avoids the
+       * "Sign in to confirm you're not a bot" block without pasting cookies.
+       * Empty means "unset" (fall back to a stored login, if any).
+       */
+      cookiesFrom: z.string().default(''),
+    })
+    .prefault({}),
   logging: z
     .object({
       level: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),

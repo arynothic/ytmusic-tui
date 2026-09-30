@@ -1,3 +1,5 @@
+import { access } from 'node:fs/promises';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { StreamError } from '@/core/errors';
@@ -22,7 +24,12 @@ interface ResolverHarness {
 /** Creates a resolver with a fixed clock and injectable process fakes. */
 function makeResolver(
   runResult: CommandResult,
-  options: { ytDlpPath?: string; findExecReturns?: string } = {},
+  options: {
+    ytDlpPath?: string;
+    findExecReturns?: string;
+    cookiesFrom?: string;
+    cookieProvider?: () => Promise<string | undefined>;
+  } = {},
 ): ResolverHarness {
   const cache = new MockCacheStore();
   const run = vi.fn(async () => runResult);
@@ -31,6 +38,8 @@ function makeResolver(
     cacheStore: cache,
     streamTtlMs: 3_600_000,
     ...(options.ytDlpPath !== undefined ? { ytDlpPath: options.ytDlpPath } : {}),
+    ...(options.cookiesFrom !== undefined ? { cookiesFrom: options.cookiesFrom } : {}),
+    ...(options.cookieProvider !== undefined ? { cookieProvider: options.cookieProvider } : {}),
     run: run,
     findExec: findExec,
     now: () => NOW,
@@ -130,6 +139,51 @@ describe('resolve', () => {
   });
 });
 
+describe('cookie authentication', () => {
+  it('passes --cookies-from-browser when a browser is configured', async () => {
+    const { resolver, run } = makeResolver(okResult(), { cookiesFrom: 'firefox' });
+
+    await resolver.resolve(TRACK_ID);
+
+    expect(run.mock.calls[0]?.[1]).toEqual([
+      '-f',
+      'bestaudio',
+      '-j',
+      '--no-playlist',
+      '--cookies-from-browser',
+      'firefox',
+      '--',
+      'https://music.youtube.com/watch?v=vid001',
+    ]);
+  });
+
+  it('uses a stored login via --cookies and deletes the temp file afterwards', async () => {
+    const { resolver, run } = makeResolver(okResult(), {
+      cookieProvider: () =>
+        Promise.resolve('# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t9\tSID\tx\n'),
+    });
+
+    await resolver.resolve(TRACK_ID);
+
+    const args = run.mock.calls[0]?.[1] as string[];
+    const index = args.indexOf('--cookies');
+    expect(index).toBeGreaterThan(-1);
+    const file = args[index + 1];
+    expect(file).toMatch(/ytmusic-cookies-.*\.txt$/u);
+    await expect(access(file as string)).rejects.toThrow();
+  });
+
+  it('prefers the configured browser over a stored login', async () => {
+    const { resolver, run } = makeResolver(okResult(), {
+      cookiesFrom: 'brave',
+      cookieProvider: () => Promise.resolve('ignored'),
+    });
+
+    await resolver.resolve(TRACK_ID);
+    expect(run.mock.calls[0]?.[1]).not.toContain('--cookies');
+  });
+});
+
 describe('cache behavior', () => {
   it('returns a cached URL without re-running yt-dlp', async () => {
     const { resolver, cache, run } = makeResolver(okResult());
@@ -188,6 +242,19 @@ describe('failure modes', () => {
       code: 'STREAM_RESOLVE_FAILED',
       message: expect.stringContaining('Video unavailable') as unknown,
     });
+  });
+
+  it('gives an actionable hint on the YouTube bot check', async () => {
+    const { resolver } = makeResolver({
+      code: 1,
+      stdout: '',
+      stderr: 'ERROR: [youtube] x: Sign in to confirm you\u2019re not a bot. Use --cookies',
+      killed: false,
+    });
+
+    const error = await resolver.resolve(TRACK_ID).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(StreamError);
+    expect((error as StreamError).message).toContain('youtube.cookiesFrom');
   });
 
   it('raises STREAM_RESOLVE_FAILED with a timeout message when killed', async () => {

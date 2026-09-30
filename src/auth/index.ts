@@ -4,6 +4,7 @@ export {
   parseCookieHeader,
   parseNetscapeCookieFile,
   serializeCookieJar,
+  serializeNetscapeCookieFile,
   type CookieJar,
 } from '@/auth/cookie-parser';
 export { FileSecretStore } from '@/auth/file-secret-store';

@@ -6,7 +6,7 @@ and manage your library without leaving the shell.
 Published to npm as **`ytmusic-tui`**; the command is **`ytmusic`**.
 
 Built with strict TypeScript, Clean Architecture, and mpv as the playback
-engine. Ships with a full-screen TUI, 500+ tests, and ≥90% test coverage.
+engine. Ships with a full-screen TUI, 490+ tests, and ≥90% test coverage.
 
 **No account is required to search or listen.** YouTube Music is queried
 anonymously out of the box; logging in is optional and only unlocks your
@@ -22,16 +22,18 @@ playlists and library.
 - **Instant playback** — `ytmusic play "Fix You"` starts mpv in the background;
   later commands (`pause`, `next`, …) control it from any terminal
 - **Full queue management** — shuffle, repeat, reorder, save/restore named queues
-- **Library & playlists** — liked songs, history, full playlist CRUD
+- **Playlists** — full CRUD (list, show, create, rename, delete, add, remove)
+- **Playback history** — recorded locally; clear it with `ytmusic cache clear --history`
 - **Lyrics** — plain and synced (LRC) when available
 - **Downloads** — optional, via yt-dlp with metadata + album artwork
-- **Full-screen TUI** — `ytmusic tui`: now-playing, queue, search, keybindings
-- **Auth** — optional browser cookie import; credentials kept in a
-  `0600`-permission file in the config directory (no OS keychain/native module)
+- **Full-screen TUI** — `ytmusic tui`: now-playing, queue, live search, keybindings
+- **Playback auth without pasting cookies** — reuse your browser's YouTube
+  session via `youtube.cookiesFrom`; `ytmusic login` (a `0600` credentials file,
+  no OS keychain/native module) is optional and only for playlists
 - **Fast** — SQLite caching (Node's built-in `node:sqlite`), rate limiting,
   retries with jittered backoff
-- **Zero native dependencies** — pure JavaScript/WASM-free install: `npm
-install -g` needs no compiler and no install-script approvals
+- **Zero native dependencies** — pure JavaScript, no WASM: `npm install -g`
+  needs no compiler and no install-script approvals
 
 ## Requirements
 
@@ -168,13 +170,28 @@ mpv.sock        # IPC socket for cross-process playback control
 All settings can also be set via environment variables with the `YTMUSIC_`
 prefix, e.g. `YTMUSIC_PLAYER_VOLUME=60`.
 
+### Playback authentication (no cookie pasting)
+
+YouTube sometimes blocks anonymous stream resolution with
+_"Sign in to confirm you're not a bot"_. Point yt-dlp at your browser's
+existing YouTube session — you only need to be logged into YouTube there:
+
+```sh
+ytmusic config set youtube.cookiesFrom chrome   # or firefox, brave, edge, chromium
+```
+
+This passes `--cookies-from-browser <browser>` to yt-dlp. If you already ran
+`ytmusic login`, that stored session is used automatically as a fallback, so no
+browser configuration is required.
+
 ## How it works
 
 - **mpv as the daemon.** The first `play` spawns mpv (detached) with a fixed
   IPC socket; every later command connects to it. That's how `ytmusic pause`
   works from a different terminal.
 - **youtubei.js** for the YouTube Music API (cookie-based sessions).
-- **yt-dlp** resolves playable audio URLs; results are cached until shortly
+- **yt-dlp** resolves playable audio URLs, reusing a browser YouTube session
+  (`youtube.cookiesFrom`) or a stored login; results are cached until shortly
   before their ~6h expiry.
 - **Persistence** uses Node's built-in `node:sqlite` (no native addon); the
   only external binaries are mpv/VLC and yt-dlp.
@@ -185,15 +202,16 @@ prefix, e.g. `YTMUSIC_PLAYER_VOLUME=60`.
 
 ## Troubleshooting
 
-| Symptom                                     | Fix                                                                                                                                |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `yt-dlp is required for playback…`          | Install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) and make sure it is on `PATH`.                                     |
-| `No supported audio player found on PATH`   | Install [mpv](https://mpv.io/installation/) (preferred) or VLC. Set `player.mpvPath`/`player.vlcPath` for non-standard paths.      |
-| `ytmusic pause` says _nothing is playing_   | Nothing is loaded yet. Start playback first with `ytmusic play` or `ytmusic tui`.                                                  |
-| Search returns no results                   | Run `ytmusic cache clear` (a stale cache), then retry; otherwise check your network.                                               |
-| `AUTH_REQUIRED` on playlist commands        | Those commands need login; everything else does not. Run `ytmusic login` or ignore them.                                           |
-| Playback stops when the terminal/TUI closes | By design, mpv is detached and keeps playing; only the TUI advances the queue automatically. Use `ytmusic next` from any terminal. |
-| `dist/cli.js` works but `ytmusic` does not  | Re-run `pnpm build && npm link` so the shim points at the fresh bundle.                                                            |
+| Symptom                                     | Fix                                                                                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `yt-dlp is required for playback…`          | Install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) and make sure it is on `PATH`.                                                                     |
+| `No supported audio player found on PATH`   | Install [mpv](https://mpv.io/installation/) (preferred) or VLC. Set `player.mpvPath`/`player.vlcPath` for non-standard paths.                                      |
+| `Sign in to confirm you're not a bot`       | Log into YouTube in your browser, then `ytmusic config set youtube.cookiesFrom chrome` (or `firefox`/`brave`/`edge`/`chromium`). Also update yt-dlp (`yt-dlp -U`). |
+| `ytmusic pause` says _nothing is playing_   | Nothing is loaded yet. Start playback first with `ytmusic play` or `ytmusic tui`.                                                                                  |
+| Search returns no results                   | Run `ytmusic cache clear` (a stale cache), then retry; otherwise check your network.                                                                               |
+| `AUTH_REQUIRED` on playlist commands        | Those commands need login; everything else does not. Run `ytmusic login` or ignore them.                                                                           |
+| Playback stops when the terminal/TUI closes | By design, mpv is detached and keeps playing; only the TUI advances the queue automatically. Use `ytmusic next` from any terminal.                                 |
+| `dist/cli.js` works but `ytmusic` does not  | Re-run `pnpm build && npm link` so the shim points at the fresh bundle.                                                                                            |
 
 Diagnostics:
 
