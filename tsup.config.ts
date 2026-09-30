@@ -10,5 +10,4 @@ export default defineConfig({
   sourcemap: true,
   dts: false,
   banner: { js: '#!/usr/bin/env node' },
-  external: ['better-sqlite3', 'keytar'],
 });

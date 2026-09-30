@@ -1,4 +1,4 @@
-import type { Database } from 'better-sqlite3';
+import type { Database } from '@/cache/sqlite';
 
 import { CacheError } from '@/core/errors';
 

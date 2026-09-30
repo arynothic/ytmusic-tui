@@ -11,7 +11,8 @@ export interface CacheEntry<T> {
 
 /**
  * Port for the local key-value cache. Synchronous by design: the backing
- * store (better-sqlite3) is synchronous and CLI latency benefits from it.
+ * store (Node's built-in `node:sqlite`) is synchronous and CLI latency
+ * benefits from it.
  * Values are JSON-serialized and validated against the given schema on
  * read — corrupt entries behave as cache misses.
  */

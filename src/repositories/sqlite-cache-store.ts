@@ -1,4 +1,4 @@
-import type { Database } from 'better-sqlite3';
+import type { Database } from '@/cache/sqlite';
 import type { z } from 'zod';
 
 import type { Migration } from '@/cache/migrations';

@@ -1,16 +1,16 @@
-import Database from 'better-sqlite3';
-
+import { openSqlite, type Database } from '@/cache/sqlite';
 import { CacheError } from '@/core/errors';
 
 /**
  * Opens (creating when needed) a SQLite database with pragmas suited for
  * a local CLI workload: WAL for crash safety, NORMAL synchronous for
- * speed, foreign keys on principle.
+ * speed, foreign keys on principle. Backed by Node's built-in
+ * `node:sqlite` (no native dependency).
  * Throws {@link CacheError} when the file cannot be opened.
  */
-export function openDatabase(file: string): Database.Database {
+export function openDatabase(file: string): Database {
   try {
-    const db = new Database(file);
+    const db = openSqlite(file);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     db.pragma('synchronous = NORMAL');

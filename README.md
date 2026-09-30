@@ -1,7 +1,9 @@
-# ytmusic-cli
+# ytmusic
 
 A fast, modern terminal client for **YouTube Music** — search, play, queue,
 and manage your library without leaving the shell.
+
+Published to npm as **`ytmusic-tui`**; the command is **`ytmusic`**.
 
 Built with strict TypeScript, Clean Architecture, and mpv as the playback
 engine. Ships with a full-screen TUI, 500+ tests, and ≥90% test coverage.
@@ -24,21 +26,29 @@ playlists and library.
 - **Lyrics** — plain and synced (LRC) when available
 - **Downloads** — optional, via yt-dlp with metadata + album artwork
 - **Full-screen TUI** — `ytmusic tui`: now-playing, queue, search, keybindings
-- **Secure auth** — browser cookie import, OS keychain storage (keytar) with
-  encrypted-file fallback
-- **Fast** — SQLite caching, rate limiting, retries with jittered backoff
+- **Auth** — optional browser cookie import; credentials kept in a
+  `0600`-permission file in the config directory (no OS keychain/native module)
+- **Fast** — SQLite caching (Node's built-in `node:sqlite`), rate limiting,
+  retries with jittered backoff
+- **Zero native dependencies** — pure JavaScript/WASM-free install: `npm
+install -g` needs no compiler and no install-script approvals
 
 ## Requirements
 
-- **Node.js 22+**
+- **Node.js 22+** (uses the built-in `node:sqlite`; no native addons)
 - **[mpv](https://mpv.io/installation/)** (preferred) or **VLC** (fallback) for playback
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp#installation)** for stream URLs and downloads
-- Linux only: `libsecret` (e.g. `apt install libsecret-1-0`) for keychain storage;
-  without it, credentials fall back to a `0600`-permission file
 
 ## Install
 
-The package is not on npm yet — install from source:
+```sh
+npm install -g ytmusic-tui
+ytmusic --version
+```
+
+Or run it without installing: `npx -y ytmusic-tui tui`.
+
+From source:
 
 ```sh
 git clone https://github.com/arynothic/ytmusic-cli.git
@@ -74,8 +84,8 @@ playback, the queue, lyrics, artist and album pages all work anonymously.
 When you _do_ want to log in, `ytmusic login` walks you through copying the
 `Cookie` request header from an authenticated `music.youtube.com` browser
 session (or you can pass `--cookie "<header>"` / `--file cookies.txt`). The
-cookie is stored in your OS keychain when available, otherwise in a `0600`
-file under the config directory.
+cookie is stored in a `0600`-permission file under the config directory
+(atomically written, same model the GitHub CLI uses for tokens).
 
 ## Commands
 
@@ -139,7 +149,7 @@ overridable with `YTMUSIC_CONFIG_HOME`):
 config.json     # settings (see `ytmusic config list`)
 cache.db        # search/metadata/stream-URL cache + saved queues (SQLite)
 history.db      # local playback history (SQLite)
-credentials     # file fallback when no OS keychain is available
+credentials     # login cookie, 0600 permissions
 mpv.sock        # IPC socket for cross-process playback control
 ```
 
@@ -152,8 +162,10 @@ prefix, e.g. `YTMUSIC_PLAYER_VOLUME=60`.
   IPC socket; every later command connects to it. That's how `ytmusic pause`
   works from a different terminal.
 - **youtubei.js** for the YouTube Music API (cookie-based sessions).
-- **yt-dlp** resolves playable audio URLs; results are cached in SQLite until
-  shortly before their ~6h expiry.
+- **yt-dlp** resolves playable audio URLs; results are cached until shortly
+  before their ~6h expiry.
+- **Persistence** uses Node's built-in `node:sqlite` (no native addon); the
+  only external binaries are mpv/VLC and yt-dlp.
 - **Clean Architecture** throughout: `cli → commands → services → core ports`,
   with `player/`, `repositories/`, `auth/`, `cache/`, `config/` implementing
   the ports. A tiny typed DI container wires everything in `cli/context.ts`.

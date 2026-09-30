@@ -2,6 +2,7 @@ import { createAppContext } from '@/cli/context';
 import { handleFatalError } from '@/cli/error-handler';
 import { installEpipeHandler } from '@/cli/pipe-safety';
 import { createProgram } from '@/cli/program';
+import { silenceSqliteExperimentalWarning } from '@/cli/warnings';
 
 /**
  * CLI entrypoint. Registered as the `ytmusic` binary via package.json `bin`.
@@ -9,6 +10,7 @@ import { createProgram } from '@/cli/program';
  * formatted stderr output and a documented exit code.
  */
 async function main(): Promise<void> {
+  silenceSqliteExperimentalWarning();
   installEpipeHandler();
   const program = createProgram(createAppContext);
   await program.parseAsync(process.argv);

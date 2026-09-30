@@ -1,25 +1,21 @@
-import type { Logger } from 'pino';
-
-import { FallbackSecretStore } from '@/auth/fallback-secret-store';
 import { FileSecretStore } from '@/auth/file-secret-store';
-import { KeytarSecretStore } from '@/auth/keytar-secret-store';
 import type { SecretStore } from '@/core/ports';
 
 /** Options for {@link createSecretStore}. */
 export interface SecretStoreOptions {
-  /** Path of the fallback credentials file. */
+  /** Path of the credentials file. */
   readonly credentialsFile: string;
-  readonly logger?: Logger;
 }
 
 /**
- * Creates the credential store for this machine: OS keychain when
- * available, permission-restricted file otherwise.
+ * Creates the credential store: a permission-restricted file (0600)
+ * inside the config directory, written atomically.
+ *
+ * The previous OS-keychain backend (keytar) was removed: it is deprecated
+ * and, as a native addon, forced npm users to approve install scripts
+ * before the CLI would work. Filesystem permissions are the same model
+ * the GitHub CLI uses for tokens.
  */
 export function createSecretStore(options: SecretStoreOptions): SecretStore {
-  return new FallbackSecretStore(
-    new KeytarSecretStore(),
-    new FileSecretStore(options.credentialsFile),
-    options.logger,
-  );
+  return new FileSecretStore(options.credentialsFile);
 }

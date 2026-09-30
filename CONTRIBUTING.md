@@ -10,7 +10,12 @@ git clone https://github.com/arynothic/ytmusic-cli.git
 cd ytmusic-cli
 corepack enable
 pnpm install
+pnpm hooks        # one-time: install the git pre-commit hook
 ```
+
+`pnpm hooks` is not run automatically — keeping the published package free
+of install scripts is what lets `npm install -g ytmusic-tui` work without
+approving build scripts.
 
 Verify your environment before touching code:
 

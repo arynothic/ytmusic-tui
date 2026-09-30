@@ -3,7 +3,7 @@
  * available, encrypted file otherwise.
  */
 export interface SecretStore {
-  /** Human-readable backend name, e.g. "keytar" or "file". */
+  /** Human-readable backend name, e.g. "file". */
   readonly name: string;
 
   /** True when the backend is usable on this machine. */

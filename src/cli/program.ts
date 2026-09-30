@@ -19,7 +19,7 @@ import { registerTuiCommand } from '@/commands/tui';
 export const CLI_NAME = 'ytmusic';
 
 /** Current CLI version, kept in sync with package.json and CHANGELOG.md. */
-export const CLI_VERSION = '0.1.0';
+export const CLI_VERSION = '0.1.1';
 
 /**
  * Builds the root commander program and registers all commands.

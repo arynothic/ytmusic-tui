@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { Database } from 'better-sqlite3';
+import type { Database } from '@/cache/sqlite';
 import type { Logger } from 'pino';
 
 import { createSecretStore, SessionManager } from '@/auth';
@@ -81,7 +81,7 @@ export async function createAppContext(): Promise<AppContext> {
   container.register(Tokens.QueueStore, () => new SqliteQueueStore(getCacheDb()));
   container.register(Tokens.HistoryStore, () => new SqliteHistoryStore(getHistoryDb()));
   container.register(Tokens.SecretStore, () =>
-    createSecretStore({ credentialsFile: paths.credentialsFile, logger }),
+    createSecretStore({ credentialsFile: paths.credentialsFile }),
   );
   container.register(
     Tokens.MusicGateway,
