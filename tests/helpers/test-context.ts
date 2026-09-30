@@ -163,6 +163,9 @@ export async function createServiceTestContext(
       new DownloadService({
         directory: `${configDir}/downloads`,
         audioFormat: 'bestaudio',
+        // Hermetic: never probe the real PATH for yt-dlp. Without this the
+        // test only passes on machines that happen to have yt-dlp installed.
+        findExec: () => Promise.resolve('/usr/bin/yt-dlp'),
         run: (command, args = [], options = {}) => {
           downloadRun.calls.push({ command, args });
           const outputIndex = args.indexOf('-o');
