@@ -6,7 +6,7 @@ the architectural rules that keep the codebase consistent.
 ## Setup
 
 ```sh
-git clone https://github.com/arynothic/ytb-cli.git ytmusic-cli
+git clone https://github.com/arynothic/ytmusic-cli.git
 cd ytmusic-cli
 corepack enable
 pnpm install

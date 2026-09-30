@@ -1,11 +1,12 @@
-import { Box, useApp, useInput } from 'ink';
-import React, { useCallback, useRef, useState } from 'react';
+import { Box, Text, useApp, useInput, useStdout } from 'ink';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Footer } from '@/cli/tui/components/footer';
 import { NowPlayingPanel } from '@/cli/tui/components/now-playing';
 import { QueuePanel } from '@/cli/tui/components/queue-panel';
 import { SearchPanel } from '@/cli/tui/components/search-panel';
 import { usePlayerState } from '@/cli/tui/use-player-state';
+import { toAppError } from '@/core/errors';
 import { type Queue, type Track } from '@/models';
 import type { PlaybackService } from '@/services/playback';
 import type { QueueService } from '@/services/queue';
@@ -20,12 +21,16 @@ export interface AppProps {
   readonly onExit?: () => void;
   /** Poll interval for player state; smaller in tests. */
   readonly tickMs?: number;
-  /** Visible list height; smaller in tests. */
+  /** Visible list height; defaults to the terminal size. */
   readonly listHeight?: number;
 }
 
 const VOLUME_STEP = 5;
 const SEEK_STEP_SECONDS = 5;
+/** Rows consumed by the header, borders and footer. */
+const CHROME_ROWS = 9;
+const MIN_LIST_ROWS = 3;
+const DEFAULT_LIST_ROWS = 12;
 
 /** Full-screen TUI root: layout, keyboard handling and mode switching. */
 export function App({
@@ -34,9 +39,10 @@ export function App({
   searchService,
   onExit,
   tickMs = 500,
-  listHeight = 12,
+  listHeight,
 }: AppProps): React.JSX.Element {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const now = usePlayerState(playback, tickMs);
   const [queue, setQueue] = useState<Queue>(() => queueService.getQueue());
   const [mode, setMode] = useState<'queue' | 'search'>('queue');
@@ -44,14 +50,37 @@ export function App({
     Math.max(0, queueService.getQueue().currentIndex),
   );
   const [searchText, setSearchText] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState('');
   const [searchResults, setSearchResults] = useState<readonly Track[]>([]);
   const [searchSelection, setSearchSelection] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const rows = stdout?.rows;
+  const listRows =
+    listHeight ??
+    (rows !== undefined ? Math.max(MIN_LIST_ROWS, rows - CHROME_ROWS) : DEFAULT_LIST_ROWS);
 
   // Input handlers must read the LATEST state — keypresses arriving in
   // quick succession would otherwise see stale render closures.
-  const stateRef = useRef({ queue, mode, selection, searchResults, searchSelection });
-  stateRef.current = { queue, mode, selection, searchResults, searchSelection };
+  const stateRef = useRef({
+    queue,
+    mode,
+    selection,
+    searchText,
+    searchedQuery,
+    searchResults,
+    searchSelection,
+  });
+  stateRef.current = {
+    queue,
+    mode,
+    selection,
+    searchText,
+    searchedQuery,
+    searchResults,
+    searchSelection,
+  };
 
   const refreshQueue = useCallback(() => {
     const current = queueService.getQueue();
@@ -67,30 +96,70 @@ export function App({
     exit();
   }, [exit, onExit]);
 
+  /** Runs an async action, surfacing failures instead of crashing the UI. */
+  const run = useCallback((action: () => Promise<unknown>, onDone?: () => void) => {
+    action()
+      .then(() => {
+        setError(null);
+        onDone?.();
+      })
+      .catch((cause: unknown) => {
+        setError(toAppError(cause).message);
+      });
+  }, []);
+
   const runSearch = useCallback(
-    async (text: string) => {
-      setSearching(true);
-      try {
-        const results = await searchService.search(text, 'songs', { limit: 15 });
-        setSearchResults(results.tracks);
-        setSearchSelection(0);
-      } finally {
-        setSearching(false);
+    (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed === '') {
+        return;
       }
+      setSearching(true);
+      setError(null);
+      searchService
+        .search(trimmed, 'songs', { limit: 15 })
+        .then((results) => {
+          setSearchResults(results.tracks);
+          setSearchSelection(0);
+          setSearchedQuery(trimmed);
+        })
+        .catch((cause: unknown) => {
+          setError(toAppError(cause).message);
+        })
+        .finally(() => {
+          setSearching(false);
+        });
     },
     [searchService],
   );
 
+  const playTrack = useCallback(
+    (track: Track, rest: readonly Track[]) => {
+      run(
+        () => playback.playTracks([track, ...rest]),
+        () => {
+          refreshQueue();
+          setMode('queue');
+        },
+      );
+    },
+    [playback, refreshQueue, run],
+  );
+
+  // Keep the queue panel in sync when playback auto-advances in the
+  // background (the queue is owned by QueueService, not React state).
+  const currentItemId = now?.item?.id ?? null;
+  useEffect(() => {
+    setQueue(queueService.getQueue());
+  }, [currentItemId, queueService]);
+
   useInput((input, key) => {
-    if (input === 'q') {
-      quit();
-      return;
-    }
     const current = stateRef.current;
 
     if (current.mode === 'search') {
       if (key.escape) {
         setMode('queue');
+        setError(null);
         return;
       }
       if (key.upArrow) {
@@ -107,55 +176,77 @@ export function App({
         setSearchText((previous) => previous.slice(0, -1));
         return;
       }
-      if (input === 'a') {
+      if (key.tab) {
         const track = current.searchResults[current.searchSelection];
         if (track !== undefined) {
-          queueService.enqueue([track]);
-          refreshQueue();
+          run(() => {
+            queueService.enqueue([track]);
+            refreshQueue();
+            return Promise.resolve();
+          });
         }
         return;
       }
       if (key.return) {
-        const track = current.searchResults[current.searchSelection];
-        if (track !== undefined) {
-          // Play the selected result; the rest of the results follow in queue.
-          const remaining = current.searchResults.filter((candidate) => candidate.id !== track.id);
-          void playback.playTracks([track, ...remaining]).then(refreshQueue);
-          setMode('queue');
+        if (
+          current.searchResults.length > 0 &&
+          current.searchedQuery === current.searchText.trim()
+        ) {
+          const track = current.searchResults[current.searchSelection];
+          if (track !== undefined) {
+            const rest = current.searchResults.filter((candidate) => candidate.id !== track.id);
+            playTrack(track, rest);
+          }
           return;
         }
-        if (searchText.trim() !== '') {
-          void runSearch(searchText.trim());
-        }
+        runSearch(current.searchText);
         return;
       }
       if (input !== undefined && input !== '' && !key.ctrl && !key.meta) {
-        setSearchText((previous) => previous + input);
+        const next = current.searchText + input;
+        setSearchText(next);
+        // A changed query invalidates the previous result set.
+        setSearchedQuery('');
+        return;
       }
       return;
     }
 
-    // Queue mode keys.
+    // Queue mode.
+    if (input === 'q') {
+      quit();
+      return;
+    }
     if (input === ' ') {
-      void playback
-        .now()
-        .then((state) =>
-          state.snapshot.status === 'playing' ? playback.pause() : playback.resume(),
-        );
+      run(() =>
+        playback
+          .now()
+          .then((state) =>
+            state.snapshot.status === 'playing' ? playback.pause() : playback.resume(),
+          ),
+      );
       return;
     }
     if (input === '/') {
       setMode('search');
       setSearchText('');
+      setSearchedQuery('');
       setSearchResults([]);
+      setError(null);
       return;
     }
     if (input === 'n') {
-      void playback.next().then(refreshQueue);
+      run(
+        () => playback.next(),
+        () => refreshQueue(),
+      );
       return;
     }
     if (input === 'p') {
-      void playback.previous().then(refreshQueue);
+      run(
+        () => playback.previous(),
+        () => refreshQueue(),
+      );
       return;
     }
     if (input === 's') {
@@ -169,29 +260,37 @@ export function App({
       return;
     }
     if (input === '+' || input === '=') {
-      void playback
-        .now()
-        .then((state) => playback.setVolume(Math.min(100, state.snapshot.volume + VOLUME_STEP)));
+      run(() =>
+        playback
+          .now()
+          .then((state) => playback.setVolume(Math.min(100, state.snapshot.volume + VOLUME_STEP))),
+      );
       return;
     }
     if (input === '-') {
-      void playback
-        .now()
-        .then((state) => playback.setVolume(Math.max(0, state.snapshot.volume - VOLUME_STEP)));
+      run(() =>
+        playback
+          .now()
+          .then((state) => playback.setVolume(Math.max(0, state.snapshot.volume - VOLUME_STEP))),
+      );
       return;
     }
     if (key.leftArrow) {
-      void playback
-        .now()
-        .then((state) =>
-          playback.seekTo(Math.max(0, state.snapshot.positionSeconds - SEEK_STEP_SECONDS)),
-        );
+      run(() =>
+        playback
+          .now()
+          .then((state) =>
+            playback.seekTo(Math.max(0, state.snapshot.positionSeconds - SEEK_STEP_SECONDS)),
+          ),
+      );
       return;
     }
     if (key.rightArrow) {
-      void playback
-        .now()
-        .then((state) => playback.seekTo(state.snapshot.positionSeconds + SEEK_STEP_SECONDS));
+      run(() =>
+        playback
+          .now()
+          .then((state) => playback.seekTo(state.snapshot.positionSeconds + SEEK_STEP_SECONDS)),
+      );
       return;
     }
     if (key.upArrow || input === 'k') {
@@ -215,13 +314,16 @@ export function App({
     if (key.return) {
       const item = current.queue.items[current.selection];
       if (item !== undefined) {
-        void playback.playItem(item.id).then(refreshQueue);
+        run(
+          () => playback.playItem(item.id),
+          () => refreshQueue(),
+        );
       }
     }
   });
 
   return (
-    <Box flexDirection="column" height={listHeight + 9}>
+    <Box flexDirection="column">
       <NowPlayingPanel now={now} />
       {mode === 'search' ? (
         <SearchPanel
@@ -229,11 +331,12 @@ export function App({
           results={searchResults}
           selection={searchSelection}
           searching={searching}
-          height={listHeight}
+          height={listRows}
         />
       ) : (
-        <QueuePanel queue={queue} selection={selection} height={listHeight} />
+        <QueuePanel queue={queue} selection={selection} height={listRows} />
       )}
+      {error !== null ? <Text color="red">✖ {error}</Text> : null}
       <Footer mode={mode} />
     </Box>
   );

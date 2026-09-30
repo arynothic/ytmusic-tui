@@ -10,6 +10,8 @@ import { createTrackFixture } from '../../helpers/fixtures';
 /** In-memory MpvIpcConnection recording commands and emitting on demand. */
 class FakeMpvConnection implements MpvIpcConnection {
   readonly requests: unknown[][] = [];
+  /** Values returned for `get_property <name>` requests. */
+  readonly properties: Record<string, unknown> = {};
   closed = false;
   failWith: Error | undefined;
   #handler: MpvEventHandler | undefined;
@@ -19,6 +21,9 @@ class FakeMpvConnection implements MpvIpcConnection {
     if (this.failWith !== undefined) {
       const error = this.failWith;
       return Promise.reject(error);
+    }
+    if (command[0] === 'get_property') {
+      return Promise.resolve(this.properties[String(command[1])]);
     }
     return Promise.resolve(undefined);
   }
@@ -170,6 +175,31 @@ describe('MpvPlayerBackend.play', () => {
     expect(spawnCalls).toHaveLength(0);
     expect(connection.requests).toContainEqual(['loadfile', playRequest.streamUrl]);
     expect((await backend.getSnapshot()).status).toBe('playing');
+  });
+
+  it('reports a resident mpv’s live state from a fresh process', async () => {
+    const { backend, connection, spawnCalls } = makeBackend({ resident: true });
+    connection.properties['path'] = 'https://rr1.googlevideo.com/videoplayback';
+    connection.properties['pause'] = false;
+    connection.properties['time-pos'] = 12.4;
+    connection.properties['volume'] = 33;
+
+    const snapshot = await backend.getSnapshot();
+
+    expect(spawnCalls).toHaveLength(0);
+    expect(snapshot.status).toBe('playing');
+    expect(snapshot.positionSeconds).toBe(12);
+    expect(snapshot.volume).toBe(33);
+  });
+
+  it('controls a resident mpv without having played anything itself', async () => {
+    const { backend, connection, spawnCalls } = makeBackend({ resident: true });
+
+    await backend.pause();
+
+    expect(spawnCalls).toHaveLength(0);
+    expect(connection.requests).toContainEqual(['set_property', 'pause', true]);
+    expect((await backend.getSnapshot()).status).toBe('paused');
   });
 });
 

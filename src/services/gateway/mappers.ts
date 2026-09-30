@@ -29,6 +29,8 @@ import {
   HeaderSchema,
   parseListItem,
   pickThumbnailUrl,
+  readItemSubtitle,
+  readItemTitle,
   readShelfItems,
   readShelfTitle,
   readText,
@@ -49,7 +51,7 @@ const PLAYLIST_TYPES = new Set(['playlist', 'podcast_show']);
 function mapArtists(item: ListItem): { id?: string; name: string }[] {
   const sources = item.artists ?? item.authors ?? (item.author !== undefined ? [item.author] : []);
   return sources.flatMap((source) => {
-    if (source.name === undefined || source.name === '') {
+    if (source?.name === undefined || source.name === '') {
       return [];
     }
     return [
@@ -114,7 +116,7 @@ export function mapTrack(node: unknown): Track | undefined {
     return undefined;
   }
   const id = item.id ?? item.endpoint?.payload?.videoId;
-  const title = readText(item.title);
+  const title = readItemTitle(item);
   if (id === undefined || title === undefined) {
     return undefined;
   }
@@ -162,11 +164,11 @@ export function mapAlbum(node: unknown): Album | undefined {
     return undefined;
   }
   const id = item.id ?? item.endpoint?.payload?.browseId;
-  const title = readText(item.title);
+  const title = readItemTitle(item);
   if (id === undefined || title === undefined) {
     return undefined;
   }
-  const subtitleText = readText(item.subtitle);
+  const subtitleText = readItemSubtitle(item);
   const parsed = AlbumSchema.safeParse({
     id,
     title,
@@ -194,7 +196,7 @@ export function mapArtist(node: unknown): Artist | undefined {
   if (item.item_type !== undefined && !ARTIST_TYPES.has(item.item_type)) {
     return undefined;
   }
-  const name = readText(item.title);
+  const name = readItemTitle(item);
   if (name === undefined) {
     return undefined;
   }
@@ -213,7 +215,7 @@ export function mapPlaylist(node: unknown): Playlist | undefined {
     return undefined;
   }
   const id = item.id ?? item.endpoint?.payload?.browseId;
-  const title = readText(item.title);
+  const title = readItemTitle(item);
   if (id === undefined || title === undefined) {
     return undefined;
   }
@@ -221,8 +223,8 @@ export function mapPlaylist(node: unknown): Playlist | undefined {
     id,
     title,
     ...(item.author?.name !== undefined ? { author: item.author.name } : {}),
-    ...(parseCount(item.item_count ?? item.song_count ?? readText(item.subtitle)) !== undefined
-      ? { trackCount: parseCount(item.item_count ?? item.song_count ?? readText(item.subtitle)) }
+    ...(parseCount(item.item_count ?? item.song_count ?? readItemSubtitle(item)) !== undefined
+      ? { trackCount: parseCount(item.item_count ?? item.song_count ?? readItemSubtitle(item)) }
       : {}),
     ...(pickThumbnailUrl(item.thumbnails) !== undefined
       ? { thumbnailUrl: pickThumbnailUrl(item.thumbnails) }
@@ -232,7 +234,7 @@ export function mapPlaylist(node: unknown): Playlist | undefined {
 }
 
 const DetailPageSchema = z.object({
-  header: HeaderSchema.optional(),
+  header: HeaderSchema.nullish(),
   contents: z.array(z.unknown()).optional(),
   sections: z.array(z.unknown()).optional(),
 });
@@ -249,13 +251,24 @@ export function mapAlbumDetails(albumId: AlbumId, response: unknown): AlbumDetai
     return undefined;
   }
   const subtitleText = readText(header.subtitle);
+  // Album headers often carry the artist only in the strapline
+  // ("Album • 2000" + strapline "Coldplay"), and individual track rows
+  // omit it entirely; propagate the album artist down to those tracks.
+  const artists = extractArtistsFromSubtitle(subtitleText);
+  const strapline = readText(header.strapline_text_one);
+  if (artists.length === 0 && strapline !== undefined) {
+    artists.push({ name: strapline });
+  }
   const tracks = collectListItems(parsed.data.contents ?? [])
     .map(mapTrack)
-    .filter((track): track is Track => track !== undefined);
+    .filter((track): track is Track => track !== undefined)
+    .map((track) =>
+      track.artists.length === 0 && artists.length > 0 ? { ...track, artists } : track,
+    );
   const result = AlbumDetailsSchema.safeParse({
     id: albumId,
     title,
-    artists: extractArtistsFromSubtitle(subtitleText),
+    artists,
     ...(extractYear(subtitleText) !== undefined ? { year: extractYear(subtitleText) } : {}),
     ...(readText(header.description) !== undefined
       ? { description: readText(header.description) }

@@ -131,7 +131,7 @@ describe('TUI App', () => {
     unmount();
   });
 
-  it('a enqueues a search result without leaving search mode', async () => {
+  it('Tab enqueues a search result without leaving search mode', async () => {
     const { props } = await makeHarness(directory);
     const { stdin, lastFrame, unmount } = render(React.createElement(App, props));
 
@@ -149,11 +149,28 @@ describe('TUI App', () => {
     });
     expect(props.queueService.getQueue().items).toHaveLength(2);
 
-    stdin.write('a');
+    stdin.write('\t');
     await vi.waitFor(() => {
       expect(props.queueService.getQueue().items.map((item) => item.track.title)).toContain('Beta');
     });
     expect(props.queueService.getQueue().items).toHaveLength(3);
+    unmount();
+  });
+
+  it('treats q and a as query text while in search mode', async () => {
+    const { props } = await makeHarness(directory);
+    const { stdin, lastFrame, unmount } = render(React.createElement(App, props));
+
+    stdin.write('/');
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain('Search:');
+    });
+    stdin.write('queen');
+    await vi.waitFor(() => {
+      expect(lastFrame()).toContain('Search: queen');
+    });
+    // 'q' must not quit, 'a' must not enqueue while typing.
+    expect(props.queueService.getQueue().items).toHaveLength(2);
     unmount();
   });
 

@@ -133,19 +133,19 @@ export class MpvPlayerBackend implements PlayerBackend {
   }
 
   async pause(): Promise<void> {
-    const connection = this.#requireConnection('pause');
+    const connection = await this.#requireConnection('pause');
     await this.#command(connection, ['set_property', 'pause', true], 'pause');
     this.#setSnapshot({ status: 'paused' });
   }
 
   async resume(): Promise<void> {
-    const connection = this.#requireConnection('resume');
+    const connection = await this.#requireConnection('resume');
     await this.#command(connection, ['set_property', 'pause', false], 'resume');
     this.#setSnapshot({ status: 'playing' });
   }
 
   async stop(): Promise<void> {
-    const connection = this.#connection;
+    const connection = await this.#connectToResident();
     if (connection !== undefined) {
       await this.#command(connection, ['stop'], 'stop');
     }
@@ -153,7 +153,7 @@ export class MpvPlayerBackend implements PlayerBackend {
   }
 
   async seekTo(positionSeconds: number): Promise<void> {
-    const connection = this.#requireConnection('seek');
+    const connection = await this.#requireConnection('seek');
     const position = Math.max(0, Math.round(positionSeconds));
     await this.#command(connection, ['set_property', 'time-pos', position], 'seek');
     this.#setSnapshot({ positionSeconds: position });
@@ -161,15 +161,21 @@ export class MpvPlayerBackend implements PlayerBackend {
 
   async setVolume(volume: number): Promise<void> {
     const clamped = clampVolume(volume);
-    const connection = this.#connection;
+    const connection = await this.#connectToResident();
     if (connection !== undefined) {
       await this.#command(connection, ['set_property', 'volume', clamped], 'set volume');
     }
     this.#setSnapshot({ volume: clamped });
   }
 
-  getSnapshot(): Promise<PlayerSnapshot> {
-    return Promise.resolve(this.#snapshot);
+  async getSnapshot(): Promise<PlayerSnapshot> {
+    // A fresh CLI process has no connection yet; reconnect to the resident
+    // mpv (if any) and read its live state so `now`/`status` are accurate.
+    const connection = await this.#connectToResident();
+    if (connection !== undefined) {
+      await this.#syncSnapshot(connection);
+    }
+    return this.#snapshot;
   }
 
   onStateChange(listener: PlayerStateListener): () => void {
@@ -203,17 +209,11 @@ export class MpvPlayerBackend implements PlayerBackend {
    * across separate processes.
    */
   async #ensureStarted(): Promise<MpvIpcConnection> {
-    if (this.#connection !== undefined) {
-      return this.#connection;
+    const resident = await this.#connectToResident();
+    if (resident !== undefined) {
+      return resident;
     }
     const socketPath = this.#socketPath();
-    try {
-      const existing = await this.#connector(socketPath);
-      this.#attach(existing, undefined);
-      return existing;
-    } catch {
-      // No resident mpv — fall through and spawn one.
-    }
     const args = [
       '--idle=yes',
       '--no-video',
@@ -281,41 +281,55 @@ export class MpvPlayerBackend implements PlayerBackend {
       .request(['observe_property', OBSERVE_TIME_POS, 'time-pos'])
       .catch(() => undefined);
     void connection.request(['observe_property', OBSERVE_VOLUME, 'volume']).catch(() => undefined);
-    // Sync with a resident player's actual state: an earlier CLI
-    // invocation may have left mpv mid-track, with its own volume and
-    // position. Track metadata itself is restored from the persisted
-    // queue by the command layer.
-    void (async () => {
-      try {
-        const [path, paused, position, volume] = await Promise.all([
-          connection.request(['get_property', 'path']),
-          connection.request(['get_property', 'pause']),
-          connection.request(['get_property', 'time-pos']),
-          connection.request(['get_property', 'volume']),
-        ]);
-        const syncedVolume = typeof volume === 'number' ? clampVolume(volume) : undefined;
-        const syncedPosition = typeof position === 'number' ? Math.round(position) : undefined;
-        const syncedStatus =
-          typeof path === 'string' && path !== '' && this.#snapshot.track === null
-            ? paused === true
-              ? ('paused' as const)
-              : ('playing' as const)
-            : undefined;
-        if (
-          syncedVolume !== undefined ||
-          syncedPosition !== undefined ||
-          syncedStatus !== undefined
-        ) {
-          this.#setSnapshot({
-            ...(syncedVolume !== undefined ? { volume: syncedVolume } : {}),
-            ...(syncedPosition !== undefined ? { positionSeconds: syncedPosition } : {}),
-            ...(syncedStatus !== undefined ? { status: syncedStatus } : {}),
-          });
-        }
-      } catch {
-        // Resident state unavailable — the optimistic snapshot stands.
-      }
-    })();
+  }
+
+  /**
+   * Reconnects to an already-running resident mpv when this process has no
+   * connection. Returns undefined when no mpv is listening — unlike
+   * {@link #ensureStarted} this never spawns a process, so read/control
+   * commands stay side-effect free when nothing is playing.
+   */
+  async #connectToResident(): Promise<MpvIpcConnection | undefined> {
+    if (this.#connection !== undefined) {
+      return this.#connection;
+    }
+    try {
+      const connection = await this.#connector(this.#socketPath());
+      this.#attach(connection, undefined);
+      return connection;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Reads the resident player's live state into the local snapshot. Track
+   * metadata is intentionally not read here: it is restored from the
+   * persisted queue by the command layer, while status/position/volume
+   * come from mpv itself.
+   */
+  async #syncSnapshot(connection: MpvIpcConnection): Promise<void> {
+    try {
+      const [path, paused, position, volume] = await Promise.all([
+        connection.request(['get_property', 'path']),
+        connection.request(['get_property', 'pause']),
+        connection.request(['get_property', 'time-pos']),
+        connection.request(['get_property', 'volume']),
+      ]);
+      const syncedVolume = typeof volume === 'number' ? clampVolume(volume) : undefined;
+      const syncedPosition = typeof position === 'number' ? Math.round(position) : undefined;
+      // Only media presence is authoritative for status: with nothing loaded
+      // the local snapshot (idle, or stopped after `ytmusic stop`) stands.
+      const hasMedia = typeof path === 'string' && path !== '';
+      const syncedStatus = hasMedia ? (paused === true ? 'paused' : 'playing') : undefined;
+      this.#setSnapshot({
+        ...(syncedVolume !== undefined ? { volume: syncedVolume } : {}),
+        ...(syncedPosition !== undefined ? { positionSeconds: syncedPosition } : {}),
+        ...(syncedStatus !== undefined ? { status: syncedStatus } : {}),
+      });
+    } catch {
+      // Resident state unavailable — the optimistic snapshot stands.
+    }
   }
 
   /** Applies one unsolicited mpv event to the snapshot. */
@@ -363,12 +377,16 @@ export class MpvPlayerBackend implements PlayerBackend {
     }
   }
 
-  /** Returns the live connection or raises PLAYER_NO_ACTIVE_SESSION. */
-  #requireConnection(action: string): MpvIpcConnection {
-    if (this.#connection === undefined) {
+  /**
+   * Returns a live connection (reconnecting to a resident mpv if needed)
+   * or raises PLAYER_NO_ACTIVE_SESSION. Never spawns a player.
+   */
+  async #requireConnection(action: string): Promise<MpvIpcConnection> {
+    const connection = await this.#connectToResident();
+    if (connection === undefined) {
       throw new PlayerError('PLAYER_NO_ACTIVE_SESSION', `Cannot ${action}: nothing is playing`);
     }
-    return this.#connection;
+    return connection;
   }
 
   /** Merges a partial update into the snapshot and notifies listeners. */

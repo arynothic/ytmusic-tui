@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Default searches returned no results.** The vendor list-item schema
+  rejected items whose optional fields (`header`, `badges`, …) were `null`,
+  and the recursive collector never descended through the flattened
+  `ItemSection` shape that YouTube Music returns for an unfiltered search.
+  The schema is now genuinely forgiving and the collector is structural.
+- **Playback control from a second terminal failed.** `pause`, `resume`,
+  `seek`, `volume` and `now` did not reconnect to the resident mpv; only
+  `play` did. All control/read commands now attach to the existing IPC
+  socket without spawning a new player, and `now` reports the live state.
+- **The queue skipped a track on every `play`.** mpv emits observed
+  `volume`/`time-pos` property events before playback begins, carrying the
+  initial `idle` snapshot; this was mistaken for "track ended" and
+  auto-advanced the queue. Only a real `playing`/`paused → idle`
+  transition now advances.
+- **Album artist metadata was missing** ("Unknown artist"): the artist is
+  read from the header strapline and propagated to album tracks.
+- **Artist search returned nothing** because names live in `flex_columns`.
+- **The TUI could not search for queries containing `q` or `a`** (`q` quit
+  and `a` enqueued while typing). Search input is now fully literal, with
+  `Tab` to enqueue and `Esc` to go back, plus inline error reporting and a
+  terminal-height-aware layout.
+
 ## [0.1.0] - 2026-08-03
 
 Initial release.
@@ -38,4 +64,4 @@ Initial release.
   jittered backoff, EPIPE-safe output, 490+ tests with ≥90% line coverage,
   CI, Dependabot, Renovate, Husky and lint-staged.
 
-[0.1.0]: https://github.com/arynothic/ytb-cli/releases/tag/v0.1.0
+[0.1.0]: https://github.com/arynothic/ytmusic-cli/releases/tag/v0.1.0

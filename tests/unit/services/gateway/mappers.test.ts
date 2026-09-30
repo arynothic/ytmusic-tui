@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { VideoIdSchema } from '@/models';
-import { collectListItems, readText } from '@/services/gateway/loose-schemas';
+import { AlbumIdSchema, VideoIdSchema } from '@/models';
+import { collectListItems, parseListItem, readText } from '@/services/gateway/loose-schemas';
 import {
   mapAlbum,
   mapAlbumDetails,
@@ -224,5 +224,74 @@ describe('collectListItems', () => {
 
   it('collects bare item arrays', () => {
     expect(collectListItems([trackNode, artistNode])).toHaveLength(2);
+  });
+
+  it('collects items from null-header ItemSections (the type:all search shape)', () => {
+    const response = {
+      contents: [
+        { type: 'ItemSection', header: null, contents: [trackNode] },
+        { type: 'ItemSection', header: null, contents: [albumNode] },
+        { type: 'ItemSection', header: { title: { text: 'Songs' } }, contents: [videoNode] },
+      ],
+    };
+    const items = collectListItems(response);
+    expect(items.map(mapTrack).filter((track) => track !== undefined)).toHaveLength(2);
+    expect(items.map(mapAlbum).filter((album) => album !== undefined)).toHaveLength(1);
+  });
+
+  it('descends through nested MusicShelf containers and MusicCardShelf cards', () => {
+    const response = {
+      contents: [
+        { type: 'MusicCardShelf', title: { text: 'Top result' }, contents: [videoNode] },
+        {
+          type: 'MusicShelf',
+          header: null,
+          contents: [{ type: 'MusicShelf', contents: [trackNode, trackNodeTextTitle] }],
+        },
+      ],
+    };
+    expect(collectListItems(response)).toHaveLength(3);
+  });
+});
+
+describe('loose schema resilience', () => {
+  it('does not drop an item when optional fields are null', () => {
+    const item = {
+      id: 'MPREb_null',
+      item_type: 'album',
+      title: { text: 'Moon Music' },
+      badges: null,
+      artists: null,
+      author: null,
+      album: null,
+      duration: null,
+    };
+    expect(parseListItem(item)?.id).toBe('MPREb_null');
+    expect(mapAlbum(item)?.title).toBe('Moon Music');
+  });
+
+  it('reads artist names from flex_columns when title is absent', () => {
+    const node = {
+      id: 'UCIaFw5VBEK8qaW6nRpx_qnw',
+      item_type: 'artist',
+      flex_columns: [{ title: { text: 'Coldplay' } }, { title: { text: 'Artist • 324M' } }],
+    };
+    expect(mapArtist(node)?.name).toBe('Coldplay');
+  });
+});
+
+describe('mapAlbumDetails', () => {
+  it('reads the album artist from the strapline and fills track artists', () => {
+    const page = {
+      header: {
+        title: { text: 'Parachutes' },
+        subtitle: { text: 'Album • 2000' },
+        strapline_text_one: { text: 'Coldplay' },
+      },
+      contents: [{ id: 'vid-parachutes', title: { text: "Don't Panic" }, item_type: 'song' }],
+    };
+    const album = mapAlbumDetails(AlbumIdSchema.parse('MPREb_parachutes'), page);
+    expect(album?.artists.map((artist) => artist.name)).toEqual(['Coldplay']);
+    expect(album?.tracks[0]?.artists.map((artist) => artist.name)).toEqual(['Coldplay']);
   });
 });

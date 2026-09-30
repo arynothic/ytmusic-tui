@@ -57,7 +57,12 @@ export class LazyPlayerBackend implements PlayerBackend {
   }
 
   async getSnapshot(): Promise<PlayerSnapshot> {
-    if (this.#backendPromise === undefined) {
+    // Resolve the real backend so a fresh CLI process can reconnect to a
+    // resident player and report its live state. When no player is
+    // installed (or detection fails) there is nothing playing.
+    try {
+      return await (await this.#backend()).getSnapshot();
+    } catch {
       return {
         status: 'idle',
         track: null,
@@ -65,7 +70,6 @@ export class LazyPlayerBackend implements PlayerBackend {
         volume: this.#initialVolume,
       };
     }
-    return (await this.#backend()).getSnapshot();
   }
 
   onStateChange(listener: PlayerStateListener): () => void {

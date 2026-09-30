@@ -4,7 +4,11 @@ A fast, modern terminal client for **YouTube Music** — search, play, queue,
 and manage your library without leaving the shell.
 
 Built with strict TypeScript, Clean Architecture, and mpv as the playback
-engine. Ships with a full-screen TUI, 490+ tests, and ≥90% test coverage.
+engine. Ships with a full-screen TUI, 500+ tests, and ≥90% test coverage.
+
+**No account is required to search or listen.** YouTube Music is queried
+anonymously out of the box; logging in is optional and only unlocks your
+playlists and library.
 
 ![node >=22](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
 ![pnpm](https://img.shields.io/badge/pnpm-10-orange)
@@ -37,7 +41,7 @@ engine. Ships with a full-screen TUI, 490+ tests, and ≥90% test coverage.
 The package is not on npm yet — install from source:
 
 ```sh
-git clone https://github.com/arynothic/ytb-cli.git ytmusic-cli
+git clone https://github.com/arynothic/ytmusic-cli.git
 cd ytmusic-cli
 corepack enable        # makes pnpm available
 pnpm install
@@ -48,21 +52,30 @@ npm link               # puts `ytmusic` on your PATH
 ## Quick start
 
 ```sh
-# Optional for search/playback; required for library & playlists
-ytmusic login          # paste your browser Cookie header when asked
-
-ytmusic play "Fix You" # ▶ starts playback in the background
-ytmusic now            # what's playing
-ytmusic pause          # ⏸
-ytmusic resume         # ▶
-ytmusic next           # next in queue
+# Just works — no login, no cookie, no configuration:
+ytmusic search "daft punk"
+ytmusic play "Get Lucky"  # ▶ starts playback in the background
+ytmusic now               # what's playing
+ytmusic pause             # ⏸
+ytmusic resume            # ▶
+ytmusic next              # next in queue
 ytmusic volume 75
-
-ytmusic tui            # full-screen mode
+ytmusic tui               # full-screen mode (recommended for continuous play)
 ```
 
 Playback keeps running after the command exits — mpv acts as the playback
 daemon, and every `ytmusic` invocation reconnects through its IPC socket.
+
+### Do I need to log in?
+
+Only if you want to **manage your playlists** (`ytmusic playlist …`). Search,
+playback, the queue, lyrics, artist and album pages all work anonymously.
+
+When you _do_ want to log in, `ytmusic login` walks you through copying the
+`Cookie` request header from an authenticated `music.youtube.com` browser
+session (or you can pass `--cookie "<header>"` / `--file cookies.txt`). The
+cookie is stored in your OS keychain when available, otherwise in a `0600`
+file under the config directory.
 
 ## Commands
 
@@ -88,6 +101,8 @@ daemon, and every `ytmusic` invocation reconnects through its IPC socket.
 
 ### TUI keybindings
 
+Queue mode:
+
 | Key                | Action                        |
 | ------------------ | ----------------------------- |
 | `space`            | play / pause                  |
@@ -100,6 +115,20 @@ daemon, and every `ytmusic` invocation reconnects through its IPC socket.
 | `←` / `→`          | seek ∓5s / ±5s                |
 | `/`                | search                        |
 | `q`                | quit (playback continues)     |
+
+Search mode:
+
+| Key         | Action                                   |
+| ----------- | ---------------------------------------- |
+| _text_      | type the query (all letters are literal) |
+| `Enter`     | run the search, then play the selection  |
+| `↑` / `↓`   | change the selected result               |
+| `Tab`       | enqueue the selected result              |
+| `Backspace` | edit the query                           |
+| `Esc`       | back to the queue                        |
+| `Ctrl-C`    | quit                                     |
+
+While the TUI is open the queue advances automatically when a track ends.
 
 ## Configuration
 
@@ -129,6 +158,26 @@ prefix, e.g. `YTMUSIC_PLAYER_VOLUME=60`.
   with `player/`, `repositories/`, `auth/`, `cache/`, `config/` implementing
   the ports. A tiny typed DI container wires everything in `cli/context.ts`.
   See [CONTRIBUTING.md](CONTRIBUTING.md) for the dependency rules.
+
+## Troubleshooting
+
+| Symptom                                     | Fix                                                                                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `yt-dlp is required for playback…`          | Install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation) and make sure it is on `PATH`.                                     |
+| `No supported audio player found on PATH`   | Install [mpv](https://mpv.io/installation/) (preferred) or VLC. Set `player.mpvPath`/`player.vlcPath` for non-standard paths.      |
+| `ytmusic pause` says _nothing is playing_   | Nothing is loaded yet. Start playback first with `ytmusic play` or `ytmusic tui`.                                                  |
+| Search returns no results                   | Run `ytmusic cache clear` (a stale cache), then retry; otherwise check your network.                                               |
+| `AUTH_REQUIRED` on playlist commands        | Those commands need login; everything else does not. Run `ytmusic login` or ignore them.                                           |
+| Playback stops when the terminal/TUI closes | By design, mpv is detached and keeps playing; only the TUI advances the queue automatically. Use `ytmusic next` from any terminal. |
+| `dist/cli.js` works but `ytmusic` does not  | Re-run `pnpm build && npm link` so the shim points at the fresh bundle.                                                            |
+
+Diagnostics:
+
+```sh
+ytmusic config path                 # where config/db/socket live
+ytmusic config get logging.level    # set to "debug" for verbose file logs
+tail -f "$(ytmusic config path)/ytmusic-cli.log"
+```
 
 ## Development
 

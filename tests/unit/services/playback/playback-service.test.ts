@@ -156,6 +156,24 @@ describe('PlaybackService auto-advance', () => {
     // Two idle events while one advance is in flight coalesce into one skip.
     expect(resolver.resolved).toEqual(['A', 'B']);
   });
+
+  it('ignores a stale idle snapshot emitted before playback starts', async () => {
+    const { playback, player, resolver, queueService } = makeHarness();
+    // A backend may emit property updates (volume/position) that carry the
+    // still-idle snapshot before play() flips it to playing. That must not
+    // be mistaken for a finished track.
+    queueService.replaceQueue([trackA, trackB], 0);
+    player.emit({ status: 'idle' });
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+
+    expect(resolver.resolved).toEqual([]);
+    expect(queueService.current()?.track.id).toBe('A');
+
+    await playback.playTracks([trackA, trackB]);
+    expect(resolver.resolved).toEqual(['A']);
+  });
 });
 
 describe('PlaybackService controls and now()', () => {

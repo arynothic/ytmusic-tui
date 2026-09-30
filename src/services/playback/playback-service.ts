@@ -1,7 +1,13 @@
 import type { Logger } from 'pino';
 
 import { invariant, ValidationError } from '@/core/errors';
-import type { HistoryStore, PlayerBackend, PlayerSnapshot, StreamResolver } from '@/core/ports';
+import type {
+  HistoryStore,
+  PlayerBackend,
+  PlayerSnapshot,
+  PlayerStatus,
+  StreamResolver,
+} from '@/core/ports';
 import type { QueueItem, Track } from '@/models';
 import type { QueueService } from '@/services/queue/queue-service';
 
@@ -45,6 +51,8 @@ export class PlaybackService {
   readonly #unsubscribe: () => void;
   /** Serializes auto-advance so duplicate idle events cannot double-skip. */
   #advancing: Promise<void> | null = null;
+  /** Last status seen, so only a real transition to idle advances. */
+  #lastStatus: PlayerStatus | null = null;
 
   constructor(options: PlaybackServiceOptions) {
     this.#player = options.player;
@@ -54,7 +62,12 @@ export class PlaybackService {
     this.#logger = options.logger;
     this.#now = options.now ?? (() => new Date());
     this.#unsubscribe = this.#player.onStateChange((snapshot) => {
-      if (snapshot.status === 'idle') {
+      const previous = this.#lastStatus;
+      this.#lastStatus = snapshot.status;
+      // Only an actual end-of-track (playing/paused → idle) should advance.
+      // Backends emit property updates (e.g. volume) before playback begins,
+      // which report a still-idle snapshot; those must be ignored.
+      if (snapshot.status === 'idle' && (previous === 'playing' || previous === 'paused')) {
         this.#onTrackEnded();
       }
     });
