@@ -46,7 +46,19 @@ npm install -g ytmusic-tui
 ytmusic --version
 ```
 
-Or run it without installing: `npx -y ytmusic-tui tui`.
+### Run without installing (npx)
+
+No global install needed — run it straight from the npm registry:
+
+```sh
+npx -y ytmusic-tui tui                  # full-screen player
+npx -y ytmusic-tui search "daft punk"
+npx -y ytmusic-tui play "Get Lucky"
+npx -y ytmusic-tui now
+```
+
+`npx` caches the package after the first run, so subsequent launches are
+instant. Use `npx -y ytmusic-tui@latest <command>` to force the newest release.
 
 From source:
 
