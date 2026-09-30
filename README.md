@@ -225,13 +225,18 @@ tail -f "$(ytmusic config path)/ytmusic-cli.log"
 
 ```sh
 pnpm install
+pnpm hooks                   # one-time: install git hooks
 pnpm dev -- play "Fix You"   # run from source (tsx)
 pnpm typecheck               # tsc --noEmit (strict)
 pnpm lint                    # eslint (typed rules, no-cycle)
-pnpm test                    # vitest (490+ tests)
+pnpm test                    # vitest (499 tests)
 pnpm test:coverage           # v8 coverage, thresholds enforced
 pnpm build                   # tsup → dist/cli.js
 ```
+
+Tests are hermetic: they never require `mpv`, `yt-dlp`, or a network
+connection. The one real-binary test (`tests/integration/`) self-skips when
+`mpv`/`ffmpeg` are absent.
 
 ## Contributing
 
@@ -240,4 +245,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Release history lives in
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

@@ -1,7 +1,22 @@
 # ytmusic-cli — Project Status & Architecture Log
 
-> Working document tracking what has been built, key decisions, and what's next.
-> Will be superseded by README.md / CONTRIBUTING.md / CHANGELOG.md before release.
+> **HISTORICAL** — this is the original build log, kept for the record of design
+> decisions. It predates the published package and is no longer maintained.
+> For the current state see [README.md](README.md), [CHANGELOG.md](CHANGELOG.md)
+> and [CONTRIBUTING.md](CONTRIBUTING.md).
+>
+> Changes after this log was written:
+>
+> - Fixed default search parsing, cross-process playback control, and a queue
+>   auto-advance race (see CHANGELOG `0.1.0`).
+> - Published to npm as **`ytmusic-tui`** (unscoped `ytmusic-cli` was rejected
+>   as too similar to `yt-music-cli`).
+> - Removed **native dependencies**: `node:sqlite` replaces `better-sqlite3`,
+>   and `keytar` is gone in favour of the `0600` credentials file, so
+>   `npm install -g` needs no build scripts (`0.1.1`).
+> - Added browser-session playback auth (`youtube.cookiesFrom`) to get past
+>   YouTube's "confirm you're not a bot" check without pasting cookies
+>   (`0.1.2`).
 
 ## Goal
 

@@ -1,7 +1,9 @@
-# Contributing to ytmusic-cli
+# Contributing to ytmusic
 
 Thanks for helping out. This document explains the development workflow and
 the architectural rules that keep the codebase consistent.
+
+The npm package is `ytmusic-tui`; the command is `ytmusic`.
 
 ## Setup
 
@@ -20,10 +22,11 @@ approving build scripts.
 Verify your environment before touching code:
 
 ```sh
-pnpm typecheck && pnpm lint && pnpm test && pnpm build
+pnpm typecheck && pnpm lint && pnpm test:coverage && pnpm build
 ```
 
-Everything must be green on a clean checkout. CI runs exactly these commands.
+Everything must be green on a clean checkout. CI runs exactly these commands
+(Node 22 and 24).
 
 ## Workflow
 
@@ -41,9 +44,9 @@ These are enforced by tooling and review; please don't bypass them.
 ### Dependency direction
 
 ```
-cli/ commands/ hooks/  →  services/  →  core/ (ports, errors, container)
-                                            ↑
-repositories/ cache/ auth/ player/ config/ ─┘   (implement core ports)
+cli/ commands/                    →  services/  →  core/ (ports, errors, container)
+                                                      ↑
+repositories/ cache/ auth/ player/ config/ ───────────┘   (implement core ports)
 models/ types/ utils/  (leaf modules — import nothing else in src)
 ```
 
@@ -62,11 +65,27 @@ models/ types/ utils/  (leaf modules — import nothing else in src)
 - Every error is a custom `AppError` subclass with a stable `code` and a
   sysexits-style `exitCode`. Never throw bare `Error` from `src/`.
 
+### Runtime constraints
+
+- **No native dependencies.** Persistence uses Node's built-in `node:sqlite`
+  and credentials use a `0600` file — never add an addon that needs a compiler
+  or an install script. npm 12 blocks dependency install scripts by default and
+  a publisher cannot whitelist them for consumers, so a native dep would break
+  `npm install -g` for users.
+- The package ships **no lifecycle scripts** (git hooks are opt-in via
+  `pnpm hooks`).
+- External binaries (mpv/VLC, yt-dlp) are optional at build/test time and only
+  required at runtime for playback.
+
 ### Testing
 
 - Unit tests mirror the source tree under `tests/unit/`.
 - Command tests use `tests/helpers/test-context.ts` (`createServiceTestContext`)
   which wires the container with in-memory doubles from `tests/mocks/`.
+- **Tests must be hermetic**: no network and no reliance on installed binaries.
+  Inject `run`/`findExec`/`spawner`/clock and provide fakes through the test
+  context. (A download test once passed locally only because `yt-dlp` happened
+  to be installed — don't repeat that.)
 - Integration tests that need real binaries live in `tests/integration/` and
   must self-skip when the binary is missing (see the mpv smoke test).
 - Coverage thresholds (≥90% lines/statements/functions, ≥80% branches) are
